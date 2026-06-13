@@ -17,7 +17,10 @@ export const config = {
   ZOHO_DOMAIN: process.env.ZOHO_DOMAIN || 'in',
   NODE_ENV: process.env.NODE_ENV || 'development',
   WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || '',
-  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || ''
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+  WHATSAPP_GRAPH_API_VERSION: process.env.WHATSAPP_GRAPH_API_VERSION || 'v25.0',
+  WHATSAPP_TEMPLATE_NAME: process.env.WHATSAPP_TEMPLATE_NAME || '',
+  WHATSAPP_TEMPLATE_LANGUAGE_CODE: process.env.WHATSAPP_TEMPLATE_LANGUAGE_CODE || ''
 };
 
 // Validations helper returning errors/warnings

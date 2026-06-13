@@ -1,6 +1,7 @@
 import { whatsappService } from '../services/whatsapp.service.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../middleware/error.middleware.js';
+import { config } from '../config/env.js';
 
 /**
  * Send WhatsApp Message Controller
@@ -38,6 +39,70 @@ export const testWhatsAppToken = async (req, res, next) => {
     logger.info('GET /api/whatsapp/test-token called');
     const result = await whatsappService.testToken();
     res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Test WhatsApp Template Controller
+ * POST /api/whatsapp/test-template
+ * Body: { phone, name }
+ */
+export const testWhatsAppTemplateController = async (req, res, next) => {
+  try {
+    logger.info('✓ POST /api/whatsapp/test-template called');
+    const { phone, name } = req.body;
+
+    if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
+      throw new ApiError(400, 'Phone number is required.');
+    }
+
+    const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Test User';
+    
+    // Check if token loads successfully
+    const tokenExists = !!config.WHATSAPP_ACCESS_TOKEN;
+    let tokenValid = false;
+    let tokenError = null;
+
+    try {
+      const tokenTest = await whatsappService.testToken();
+      tokenValid = tokenTest.valid;
+      if (!tokenTest.valid) {
+        tokenError = tokenTest.error || tokenTest.message || 'Token verification failed';
+      }
+    } catch (err) {
+      tokenError = err.message;
+    }
+
+    let metaAccepted = false;
+    let messageId = null;
+    let apiError = null;
+    let responseData = null;
+
+    if (tokenExists && tokenValid) {
+      try {
+        responseData = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName);
+        metaAccepted = true;
+        messageId = responseData.messages?.[0]?.id || 'N/A';
+      } catch (err) {
+        metaAccepted = false;
+        apiError = err.message;
+      }
+    } else {
+      apiError = `Token validation failed: ${tokenError || 'Token not valid'}`;
+    }
+
+    res.status(200).json({
+      success: metaAccepted,
+      tokenLoaded: tokenExists,
+      tokenValid,
+      tokenError,
+      metaAccepted,
+      messageId,
+      error: apiError,
+      data: responseData
+    });
   } catch (error) {
     next(error);
   }

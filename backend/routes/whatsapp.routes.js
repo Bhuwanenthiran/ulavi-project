@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendWhatsApp, testWhatsAppToken } from '../controllers/whatsapp.controller.js';
+import { sendWhatsApp, testWhatsAppToken, testWhatsAppTemplateController } from '../controllers/whatsapp.controller.js';
 
 const router = Router();
 
@@ -14,5 +14,11 @@ router.post('/send', sendWhatsApp);
  * GET /api/whatsapp/test-token
  */
 router.get('/test-token', testWhatsAppToken);
+
+/**
+ * Test WhatsApp Template
+ * POST /api/whatsapp/test-template
+ */
+router.post('/test-template', testWhatsAppTemplateController);
 
 export default router;
