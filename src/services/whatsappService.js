@@ -29,7 +29,13 @@ export const sendWhatsAppMessage = async (contact) => {
       },
       body: JSON.stringify({ 
         phone: contact.phone.trim(),
-        name: contact.name ? contact.name.trim() : 'Customer'
+        name: contact.name ? contact.name.trim() : 'Customer',
+        fullName: contact.name ? contact.name.trim() : '—',
+        company: contact.company ? contact.company.trim() : '—',
+        title: contact.title || contact.notes ? (contact.title || contact.notes).trim() : '—',
+        email: contact.email ? contact.email.trim() : '—',
+        website: contact.website ? contact.website.trim() : '—',
+        address: contact.address ? contact.address.trim() : '—'
       }),
     });
 

@@ -16,13 +16,14 @@ class WhatsappService {
    * @param {string} phone - Recipient phone number
    * @returns {Promise<Object>} Meta API response details
    */
-  async sendWhatsAppTemplate(phone, contactName = 'Customer') {
+   async sendWhatsAppTemplate(phone, contactName = 'Customer', details = {}) {
     const { 
       WHATSAPP_ACCESS_TOKEN, 
       WHATSAPP_PHONE_NUMBER_ID,
       WHATSAPP_GRAPH_API_VERSION,
       WHATSAPP_TEMPLATE_NAME,
-      WHATSAPP_TEMPLATE_LANGUAGE_CODE
+      WHATSAPP_TEMPLATE_LANGUAGE_CODE,
+      WHATSAPP_BUSINESS_PHONE
     } = config;
 
     // Validate configuration existence
@@ -35,10 +36,19 @@ class WhatsappService {
       throw new Error(`WhatsApp API configuration is missing: ${missing.join(', ')}`);
     }
 
-    const templateName = WHATSAPP_TEMPLATE_NAME || '3p_direct_integration_test_template';
+    const templateName = WHATSAPP_TEMPLATE_NAME || 'hello_world';
     const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en_US';
     const apiVersion = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
+    
     const cleanPhone = phone.trim().replace(/[+\s-]/g, ''); // Extract digits only
+    const cleanBusinessPhone = WHATSAPP_BUSINESS_PHONE ? WHATSAPP_BUSINESS_PHONE.trim().replace(/[+\s-]/g, '') : '';
+
+    // Verify recipient is different from the business sender phone
+    if (cleanPhone === cleanBusinessPhone) {
+      const errMsg = 'Cannot send a WhatsApp template message to the business sender number.';
+      logger.error(errMsg);
+      throw new Error(errMsg);
+    }
 
     logger.info(`Preparing to send WhatsApp Template "${templateName}" to ${cleanPhone} with contactName "${contactName}"...`);
 
@@ -56,20 +66,43 @@ class WhatsappService {
       }
     };
 
-    // Only include components if template is not 'hello_world'
-    if (templateName !== 'hello_world') {
+    // Only include components if the selected template actually requires parameters
+    if (templateName === 'cardsync_card_received') {
+      // 7-parameter business card template
+      const greetingName = details.name || contactName || 'Customer';
+      const fullName     = details.fullName || greetingName;
+      const company      = details.company  || '—';
+      const title        = details.title    || '—';
+      const email        = details.email    || '—';
+      const website      = details.website  || '—';
+      const address      = details.address  || '—';
+
       payload.template.components = [
         {
           type: 'body',
           parameters: [
-            {
-              type: 'text',
-              text: contactName
-            }
+            { type: 'text', text: greetingName }, // {{1}} Greeting Name
+            { type: 'text', text: fullName },     // {{2}} Full Name
+            { type: 'text', text: company },      // {{3}} Company
+            { type: 'text', text: title },        // {{4}} Title
+            { type: 'text', text: email },        // {{5}} Email
+            { type: 'text', text: website },      // {{6}} Website
+            { type: 'text', text: address }       // {{7}} Address
+          ]
+        }
+      ];
+    } else if (templateName !== 'hello_world') {
+      // Custom templates: 1-parameter fallback (greeting name)
+      payload.template.components = [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: contactName }
           ]
         }
       ];
     }
+    // hello_world: no components needed
 
     logger.info(`Outbound Meta API Payload: ${JSON.stringify(payload, null, 2)}`);
 
@@ -95,7 +128,7 @@ class WhatsappService {
       logger.info(`Telemetry - Message ID: ${messageId}`);
       logger.info(`Telemetry - Message Status: ${messageStatus}`);
 
-      return responseBody;
+      return { payload, response: responseBody };
     } catch (error) {
       const httpStatus = error.response?.status || 'N/A';
       const responseBody = error.response?.data || {};
@@ -111,7 +144,10 @@ class WhatsappService {
       logger.error(`Telemetry - Response Body: ${JSON.stringify(responseBody)}`);
       logger.error(`Telemetry - Error Message: ${errMsg}`);
 
-      throw new Error(`Meta API error: ${errMsg}`);
+      const customError = new Error(`Meta API error: ${errMsg}`);
+      customError.payload = payload;
+      customError.response = responseBody;
+      throw customError;
     }
   }
 

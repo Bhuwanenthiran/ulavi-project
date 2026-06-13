@@ -11,19 +11,21 @@ import { config } from '../config/env.js';
 export const sendWhatsApp = async (req, res, next) => {
   try {
     logger.info('✓ WhatsApp Send Request Received');
-    const { phone, name } = req.body;
+    const { phone, name, fullName, company, title, email, website, address } = req.body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
       throw new ApiError(400, 'Phone number is required and cannot be empty.');
     }
 
     const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Customer';
-    const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName);
+    const details = { name: contactName, fullName, company, title, email, website, address };
+    const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName, details);
 
     res.status(200).json({
       success: true,
       message: 'WhatsApp template sent successfully',
-      data: result
+      data: result.response,
+      payload: result.payload
     });
   } catch (error) {
     next(error);
@@ -52,13 +54,14 @@ export const testWhatsAppToken = async (req, res, next) => {
 export const testWhatsAppTemplateController = async (req, res, next) => {
   try {
     logger.info('✓ POST /api/whatsapp/test-template called');
-    const { phone, name } = req.body;
+    const { phone, name, fullName, company, title, email, website, address } = req.body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
       throw new ApiError(400, 'Phone number is required.');
     }
 
     const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Test User';
+    const details = { name: contactName, fullName, company, title, email, website, address };
     
     // Check if token loads successfully
     const tokenExists = !!config.WHATSAPP_ACCESS_TOKEN;
@@ -79,15 +82,20 @@ export const testWhatsAppTemplateController = async (req, res, next) => {
     let messageId = null;
     let apiError = null;
     let responseData = null;
+    let finalPayload = null;
 
     if (tokenExists && tokenValid) {
       try {
-        responseData = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName);
+        const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName, details);
         metaAccepted = true;
+        finalPayload = result.payload;
+        responseData = result.response;
         messageId = responseData.messages?.[0]?.id || 'N/A';
       } catch (err) {
         metaAccepted = false;
         apiError = err.message;
+        finalPayload = err.payload || null;
+        responseData = err.response || null;
       }
     } else {
       apiError = `Token validation failed: ${tokenError || 'Token not valid'}`;
@@ -101,6 +109,7 @@ export const testWhatsAppTemplateController = async (req, res, next) => {
       metaAccepted,
       messageId,
       error: apiError,
+      payload: finalPayload,
       data: responseData
     });
   } catch (error) {
