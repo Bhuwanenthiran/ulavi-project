@@ -89,7 +89,7 @@ class WhatsappService {
     };
 
     // Only include components if the selected template actually requires parameters
-    if (templateName === 'cardsync_card_saved') {
+    if (templateName !== 'hello_world') {
       payload.template.components = [
         {
           type: 'body',
@@ -102,18 +102,6 @@ class WhatsappService {
       ];
 
       logger.info(`[Debug] WhatsApp template parameters: ${JSON.stringify(payload.template.components[0].parameters, null, 2)}`);
-    } else {
-      // Fallback/other template
-      payload.template.components = [
-        {
-          type: 'body',
-          parameters: [
-            { type: 'text', text: greetingName },
-            { type: 'text', text: email },
-            { type: 'text', text: company }
-          ]
-        }
-      ];
     }
 
     const numParams = payload.template.components?.[0]?.parameters?.length || 0;
