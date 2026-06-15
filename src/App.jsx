@@ -384,6 +384,10 @@ function App() {
           localSteps = { ...localSteps, emailSend: 'success' };
           setProcessingSteps(localSteps);
           console.log('[TimeLog] Email Send End (Skipped)');
+        } else if (!activeForm.email || typeof activeForm.email !== 'string' || activeForm.email.trim().length === 0) {
+          console.log('[TimeLog] Email Send skipped because recipient email is missing');
+          localSteps = { ...localSteps, emailSend: 'success' };
+          setProcessingSteps(localSteps);
         } else {
           try {
             const emailResult = await sendEmail(activeForm, activeForm.emailMessage);
@@ -393,7 +397,7 @@ function App() {
               const emailEndTime = performance.now();
               console.log(`[TimeLog] Email Send End. Duration: ${(emailEndTime - emailStartTime).toFixed(2)}ms`);
             } else {
-              throw new Error('EmailJS returned failure');
+              throw new Error(emailResult.error || 'EmailJS returned failure');
             }
           } catch (err) {
             console.error('Email send error:', err);
@@ -401,7 +405,7 @@ function App() {
             setProcessingSteps(localSteps);
             setFailedStep('emailSend');
             setIsProcessing(false);
-            addToast('Email delivery failed.', 'error');
+            addToast(err.message || 'Email delivery failed.', 'error');
             return;
           }
         }

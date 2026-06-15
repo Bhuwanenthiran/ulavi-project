@@ -146,15 +146,24 @@ export const processQueue = async (onQueueProcessed, onSyncResult) => {
             await saveContactToDB(contact);
 
             const msg = item.message || item.payload?.message || contact.emailMessage;
-            const emailRes = await sendEmail(contact, msg);
-            if (!emailRes.success) {
-              throw new Error(emailRes.error || 'EmailJS sending failed');
-            }
             
-            contact = { ...contact, emailStatus: 'sent' };
-            contactsMap.set(contact.id, contact);
-            await saveContactToDB(contact);
-            await removeActionFromQueue(item.id);
+            if (!contact.email || typeof contact.email !== 'string' || contact.email.trim().length === 0) {
+              console.log('✓ SEND_EMAIL Skipped: recipient email is missing');
+              contact = { ...contact, emailStatus: 'sent' };
+              contactsMap.set(contact.id, contact);
+              await saveContactToDB(contact);
+              await removeActionFromQueue(item.id);
+            } else {
+              const emailRes = await sendEmail(contact, msg);
+              if (!emailRes.success) {
+                throw new Error(emailRes.error || 'EmailJS sending failed');
+              }
+              
+              contact = { ...contact, emailStatus: 'sent' };
+              contactsMap.set(contact.id, contact);
+              await saveContactToDB(contact);
+              await removeActionFromQueue(item.id);
+            }
           } else if (type === 'SYNC_ZOHO') {
             if (contact.zohoLeadId) {
               console.log('✓ Zoho Lead ID already exists, skipping lead creation');

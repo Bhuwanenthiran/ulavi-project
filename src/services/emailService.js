@@ -24,6 +24,12 @@ const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 export const sendEmail = async (contact, message) => {
   console.log('✓ Email Send Started');
 
+  // 1. Verify and log EmailJS Configuration (without exposing secret values)
+  console.log('--- EmailJS Configuration Verification ---');
+  console.log(`- Service ID Loaded: ${SERVICE_ID ? 'YES (Length: ' + SERVICE_ID.length + ')' : 'NO'}`);
+  console.log(`- Template ID Loaded: ${TEMPLATE_ID ? 'YES (Length: ' + TEMPLATE_ID.length + ')' : 'NO'}`);
+  console.log(`- Public Key Loaded: ${PUBLIC_KEY ? 'YES (Length: ' + PUBLIC_KEY.length + ')' : 'NO'}`);
+
   // ── Validate recipient email ──
   if (!contact?.email || typeof contact.email !== 'string' || contact.email.trim().length === 0) {
     const error = 'Cannot send email: recipient email is missing.';
@@ -39,18 +45,40 @@ export const sendEmail = async (contact, message) => {
   }
 
   const templateParams = {
-    name:    contact.name  ? contact.name.trim()  : 'Unknown',
+    name:    contact.name    ? contact.name.trim()    : 'Unknown',
     email:   contact.email.trim(),
+    company: contact.company ? contact.company.trim() : 'Not Available',
     message: message || '',
   };
 
+  // 2. Log frontend request parameters
+  console.log('--- EmailJS Frontend Request parameters ---');
+  console.log(`- Recipient Email (destination): ${contact.email.trim()}`);
+  console.log(`- Recipient Name: ${templateParams.name}`);
+  console.log(`- Company: ${templateParams.company}`);
+  console.log(`- Message Body: ${templateParams.message}`);
+  console.log('- Template Parameters:', JSON.stringify(templateParams, null, 2));
+
   try {
     const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY);
-    console.log('✓ Email Sent Successfully', response.status, response.text);
-    return { success: true };
+    
+    // 3. Log EmailJS Success Response
+    console.log('--- EmailJS Success Response ---');
+    console.log(`- HTTP Status: ${response.status}`);
+    console.log(`- Success Text: ${response.text}`);
+    console.log('✓ Email Sent Successfully');
+    
+    return { success: true, response };
   } catch (err) {
+    // 3. Log EmailJS Error Response
+    console.error('--- EmailJS Error Response ---');
+    console.error(`- HTTP Status / Error Code: ${err?.status || 'N/A'}`);
+    console.error(`- Error Text: ${err?.text || 'N/A'}`);
+    console.error(`- Error Message: ${err?.message || 'N/A'}`);
+    
     const error = err?.text || err?.message || 'Unknown EmailJS error';
     console.error('✓ Email Send Failed:', error);
-    return { success: false, error };
+    
+    return { success: false, error, status: err?.status, text: err?.text };
   }
 };
