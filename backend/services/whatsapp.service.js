@@ -89,7 +89,7 @@ class WhatsappService {
     };
 
     // Only include components if the selected template actually requires parameters
-    if (templateName === 'business_card_received') {
+    if (templateName === 'cardsync_card_saved') {
       payload.template.components = [
         {
           type: 'body',
