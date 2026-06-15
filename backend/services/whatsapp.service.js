@@ -36,7 +36,7 @@ class WhatsappService {
       throw new Error(`WhatsApp API configuration is missing: ${missing.join(', ')}`);
     }
 
-    const templateName = WHATSAPP_TEMPLATE_NAME || 'card_received';
+    const templateName = WHATSAPP_TEMPLATE_NAME;
     const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en';
     const apiVersion = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
     
@@ -89,7 +89,7 @@ class WhatsappService {
     };
 
     // Only include components if the selected template actually requires parameters
-    if (templateName === 'card_received') {
+    if (templateName === 'cardsync_card_saved') {
       payload.template.components = [
         {
           type: 'body',
@@ -122,13 +122,14 @@ class WhatsappService {
     // Log before sending:
     // - Template Name
     // - Language
+    // - Phone Number ID
     // - Recipient
     // - Number of Parameters
     // - Parameter Values
     logger.info(`Sending WhatsApp Message Details:
 - Template Name: ${templateName}
-- Language: ${languageCode}
-- Recipient: ${cleanPhone}
+- Language Code: ${languageCode}
+- Recipient Phone: ${cleanPhone}
 - Number of Parameters: ${numParams}
 - Parameter Values: ${JSON.stringify(paramValues)}`);
 
