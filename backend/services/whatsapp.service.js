@@ -36,8 +36,8 @@ class WhatsappService {
       throw new Error(`WhatsApp API configuration is missing: ${missing.join(', ')}`);
     }
 
-    const templateName = WHATSAPP_TEMPLATE_NAME || 'hello_world';
-    const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en_US';
+    const templateName = WHATSAPP_TEMPLATE_NAME || 'card_received';
+    const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en';
     const apiVersion = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
     
     const cleanPhone = phone.trim().replace(/[+\s-]/g, ''); // Extract digits only
@@ -89,7 +89,7 @@ class WhatsappService {
     };
 
     // Only include components if the selected template actually requires parameters
-    if (templateName === 'cardsync_card_saved') {
+    if (templateName === 'card_received') {
       payload.template.components = [
         {
           type: 'body',
@@ -102,28 +102,37 @@ class WhatsappService {
       ];
 
       logger.info(`[Debug] WhatsApp template parameters: ${JSON.stringify(payload.template.components[0].parameters, null, 2)}`);
-    } else if (templateName !== 'hello_world') {
-      // Custom templates: 1-parameter fallback (greeting name)
+    } else {
+      // Fallback/other template
       payload.template.components = [
         {
           type: 'body',
           parameters: [
-            { type: 'text', text: contactName }
+            { type: 'text', text: greetingName },
+            { type: 'text', text: email },
+            { type: 'text', text: company }
           ]
         }
       ];
     }
-    // hello_world: no components needed
+
+    const numParams = payload.template.components?.[0]?.parameters?.length || 0;
+    const paramValues = payload.template.components?.[0]?.parameters?.map(p => p.text) || [];
+
+    // Log before sending:
+    // - Template Name
+    // - Language
+    // - Recipient
+    // - Number of Parameters
+    // - Parameter Values
+    logger.info(`Sending WhatsApp Message Details:
+- Template Name: ${templateName}
+- Language: ${languageCode}
+- Recipient: ${cleanPhone}
+- Number of Parameters: ${numParams}
+- Parameter Values: ${JSON.stringify(paramValues)}`);
 
     logger.info(`Outbound Meta API Payload: ${JSON.stringify(payload, null, 2)}`);
-
-    // Log template parameters before sending, as requested (Template Name, Recipient Phone, Name, Email, Company)
-    logger.info(`Sending WhatsApp Message:
-- Template Name: ${templateName}
-- Recipient Phone: ${cleanPhone}
-- Name: ${greetingName}
-- Email: ${email}
-- Company: ${company}`);
 
     try {
       const response = await axios.post(url, payload, {
