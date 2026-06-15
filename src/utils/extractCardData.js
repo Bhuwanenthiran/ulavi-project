@@ -1,7 +1,7 @@
-import { cleanOCRText } from './cleanOCRText';
-import { parseEmails } from './parseEmails';
-import { parsePhones } from './parsePhones';
-import { prioritizePhones, prioritizeEmails } from './prioritizeContacts';
+import { cleanOCRText } from './cleanOCRText.js';
+import { parseEmails } from './parseEmails.js';
+import { parsePhones } from './parsePhones.js';
+import { prioritizePhones, prioritizeEmails } from './prioritizeContacts.js';
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -118,6 +118,7 @@ const parseCompanyLocal = (lines, detectedName) => {
 
     const lower = line.toLowerCase();
     if (lower.includes('@') || lower.includes('www') || /\d{5,}/.test(line)) return;
+    if (line.replace(/\D/g, '').length >= 7) return;
     if (detectedName && line === detectedName) return;
 
     const words = lower.split(/\W+/);
@@ -206,6 +207,63 @@ export const extractCardData = (mergedText) => {
     e => normalizeEmail(e) !== normalizeEmail(email)
   ) || '';
 
+  // ── Websites: parse domains and URLs
+  const websiteRegex = /(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+)\.([a-zA-Z]{2,6})(?:\/[^\s]*)?/i;
+  const websites = [];
+  lines.forEach(line => {
+    const cleanLine = line.trim();
+    if (cleanLine.includes('@')) return; // Skip email
+    const match = cleanLine.match(websiteRegex);
+    if (match) {
+      const lower = cleanLine.toLowerCase();
+      if (lower.includes('www.') || lower.includes('http') || /\.(com|org|net|in|co|io|me|tech|edu|gov|xyz)\b/.test(lower)) {
+        if (!websites.includes(cleanLine)) {
+          websites.push(cleanLine);
+        }
+      }
+    }
+  });
+  const website = websites[0] || '';
+
+  // ── Title: parse Designation/Job Role
+  const commonTitleRegex = /\b(ceo|founder|director|manager|engineer|developer|software\s+engineer|ui\s+designer|ux\s+designer|ui\/ux\s+designer|marketing\s+manager|digital\s+marketing\s+specialist|consultant|analyst|sales\s+executive)\b/i;
+  let title = '';
+  for (const line of lines) {
+    if (commonTitleRegex.test(line)) {
+      title = line.trim();
+      break;
+    }
+  }
+  // Fallback to broader job title words
+  if (!title) {
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      const words = lower.split(/\W+/);
+      const hasJobWord = JOB_TITLE_WORDS.some(w => words.includes(w));
+      if (hasJobWord && !lower.includes('@') && !lower.includes('www') && !lower.includes('http') && !/\d{5,}/.test(line)) {
+        title = line.trim();
+        break;
+      }
+    }
+  }
+
+  // ── Address: parse street/city/state/PIN/ZIP
+  const addressKeywords = /\b(street|st\.|road|rd\.|avenue|ave\.|nagar|layout|lane|ln|drive|dr|court|ct|place|pl|square|sq|building|bldg|floor|fl|sector|block|p\.?o\.?\s*box|city|state|zip|post|postal|pin\s*code|chennai|mumbai|bangalore|delhi|india|tamil\s*nadu|karnataka|maharashtra)\b/i;
+  const addressLines = [];
+  lines.forEach(line => {
+    const cleanLine = line.trim();
+    if (cleanLine.includes('@') || cleanLine.toLowerCase().includes('www') || cleanLine.toLowerCase().includes('http')) return;
+    const isPhone = uniquePhones.some(p => p.replace(/\D/g, '') === cleanLine.replace(/\D/g, ''));
+    if (isPhone) return;
+
+    if (addressKeywords.test(cleanLine) || /\b\d{5,6}\b/.test(cleanLine)) {
+      if (!addressLines.includes(cleanLine)) {
+        addressLines.push(cleanLine);
+      }
+    }
+  });
+  const address = addressLines.join(', ');
+
   const { name }    = parseNameLocal(lines);
   const { company } = parseCompanyLocal(lines, name);
 
@@ -218,5 +276,8 @@ export const extractCardData = (mergedText) => {
     altEmail: altEmail,
     phones:   uniquePhones,
     emails:   uniqueEmails,
+    title,
+    website,
+    address
   };
 };

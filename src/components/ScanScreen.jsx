@@ -256,6 +256,17 @@ export default function ScanScreen({ onCardScanned }) {
       console.log("OCR completed");
 
       const extractedData = extractCardData(mergedText);
+      console.log('[Debug] Structured OCR extraction result:', {
+        name: extractedData.name,
+        company: extractedData.company,
+        phone: extractedData.phone,
+        altPhone: extractedData.altPhone,
+        email: extractedData.email,
+        altEmail: extractedData.altEmail,
+        title: extractedData.title,
+        website: extractedData.website,
+        address: extractedData.address
+      });
       
       // Preserve original imageFile (without filters) for database and display
       extractedData.imageBlob = imageFile;

@@ -16,6 +16,9 @@ export const mapContactToZoho = (contact) => {
     Company: contact.company ? contact.company.trim() : 'Not Provided',
     Email: contact.email ? contact.email.trim() : undefined,
     Phone: contact.phone ? contact.phone.trim() : undefined,
+    Designation: contact.title ? contact.title.trim() : undefined,
+    Website: contact.website ? contact.website.trim() : undefined,
+    Street: contact.address ? contact.address.trim() : undefined,
   };
 };
 
@@ -27,6 +30,7 @@ export const mapContactToZoho = (contact) => {
 export const createZohoLead = async (contact) => {
   console.log('✓ Zoho Sync Started', contact);
   const payload = mapContactToZoho(contact);
+  console.log('[Debug] Zoho CRM payload:', JSON.stringify(payload, null, 2));
   
   try {
     const response = await fetch(`${API_BASE_URL}/api/zoho/create-lead`, {

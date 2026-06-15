@@ -21,6 +21,24 @@ export const sendWhatsAppMessage = async (contact) => {
     return { success: false, error };
   }
 
+  const cleanField = (val) => {
+    if (!val || typeof val !== 'string') return 'Not Available';
+    const trimmed = val.trim();
+    const lower = trimmed.toLowerCase();
+    if (
+      trimmed === '' || 
+      trimmed === '—' || 
+      trimmed === 'N/A' || 
+      lower === 'not provided' || 
+      lower === 'unknown' || 
+      lower === 'unknown company' || 
+      lower === 'unknown name'
+    ) {
+      return 'Not Available';
+    }
+    return trimmed;
+  };
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/whatsapp/send`, {
       method: 'POST',
@@ -29,13 +47,13 @@ export const sendWhatsAppMessage = async (contact) => {
       },
       body: JSON.stringify({ 
         phone: contact.phone.trim(),
-        name: contact.name ? contact.name.trim() : 'Customer',
-        fullName: contact.name ? contact.name.trim() : '—',
-        company: contact.company ? contact.company.trim() : '—',
-        title: contact.title || contact.notes ? (contact.title || contact.notes).trim() : '—',
-        email: contact.email ? contact.email.trim() : '—',
-        website: contact.website ? contact.website.trim() : '—',
-        address: contact.address ? contact.address.trim() : '—'
+        name: cleanField(contact.name),
+        fullName: cleanField(contact.name),
+        company: cleanField(contact.company),
+        title: cleanField(contact.title ? contact.title : contact.notes),
+        email: cleanField(contact.email),
+        website: cleanField(contact.website),
+        address: cleanField(contact.address)
       }),
     });
 

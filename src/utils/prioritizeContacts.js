@@ -1,5 +1,5 @@
-import { classifyPhone } from './classifyPhone';
-import { classifyEmail } from './classifyEmail';
+import { classifyPhone } from './classifyPhone.js';
+import { classifyEmail } from './classifyEmail.js';
 
 /**
  * Prioritizes an array of phone numbers and returns the best candidate for primary contact.

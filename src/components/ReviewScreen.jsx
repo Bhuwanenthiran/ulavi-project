@@ -31,7 +31,15 @@ function RippleButton({ children, className, onClick, ...props }) {
   return <button className={className} onClick={createRipple} {...props}>{children}</button>;
 }
 
-export default function ReviewScreen({ scannedData, previewUrl, onSave, onDiscard, isOffline }) {
+const stepsConfig = [
+  { key: 'duplicateCheck', label: 'Checking duplicates...' },
+  { key: 'zohoSync',      label: 'Syncing with Zoho CRM...' },
+  { key: 'emailSend',     label: 'Sending Email...' },
+  { key: 'whatsappSend',  label: 'Sending WhatsApp...' },
+  { key: 'localSave',     label: 'Saving locally...' }
+];
+
+export default function ReviewScreen({ scannedData, previewUrl, onSave, onDiscard, isOffline, isProcessing = false, processingSteps = {}, failedStep = null }) {
   const [form, setForm] = useState({
     name: '', company: '', email: '', altEmail: '',
     phone: '', altPhone: '', 
@@ -100,6 +108,7 @@ Business Card Scanner Team`;
   };
 
   const handleSave = () => {
+    if (isProcessing) return;
     const newErrors = {};
     if (!form.name.trim()) newErrors.name = true;
     if (!form.phone.trim()) newErrors.phone = true;
@@ -270,13 +279,117 @@ Business Card Scanner Team`;
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-        <RippleButton className="btn btn-outline" style={{ flex: 1 }} onClick={onDiscard}>Discard</RippleButton>
-        <RippleButton className="btn btn-success" style={{ flex: 2 }} onClick={handleSave}>
-          <span className="material-icons">send</span>
-          Save & Send
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <RippleButton 
+          className="btn btn-outline" 
+          style={{ flex: 1 }} 
+          onClick={isProcessing ? undefined : onDiscard}
+          disabled={isProcessing}
+        >
+          Discard
+        </RippleButton>
+        <RippleButton 
+          className="btn btn-success" 
+          style={{ flex: 2 }} 
+          onClick={handleSave}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <>
+              <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderTopColor: 'white', borderColor: 'rgba(255,255,255,0.2)' }} />
+              Processing...
+            </>
+          ) : (
+            <>
+              <span className="material-icons">send</span>
+              {failedStep ? 'Retry Save & Send' : 'Save & Send'}
+            </>
+          )}
         </RippleButton>
       </div>
+
+      {(isProcessing || failedStep !== null) && (
+        <div className="card" style={{
+          marginBottom: 32,
+          padding: 20,
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 'var(--radius-card)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-md)',
+          animation: 'pageIn 0.3s ease-out'
+        }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {failedStep ? (
+              <>
+                <span className="material-icons" style={{ color: 'var(--danger)', fontSize: 18 }}>error</span>
+                <span style={{ color: 'var(--danger)' }}>Save & Send Failed</span>
+              </>
+            ) : (
+              <>
+                <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                <span>Processing Dispatches...</span>
+              </>
+            )}
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {stepsConfig.map((step) => {
+              const status = processingSteps[step.key];
+              const isIdle = status === 'idle' || !status;
+              const isRunning = status === 'running';
+              const isSuccess = status === 'success';
+              const isQueued = status === 'queued';
+              const isFailed = status === 'failed';
+
+              let icon = 'radio_button_unchecked';
+              let iconColor = 'var(--text-secondary)';
+              let textColor = 'var(--text-secondary)';
+              let statusText = 'Pending';
+              let stepClass = '';
+
+              if (isRunning) {
+                icon = 'sync';
+                iconColor = 'var(--primary)';
+                textColor = 'var(--text-primary)';
+                statusText = 'In progress...';
+                stepClass = 'syncing-icon';
+              } else if (isSuccess) {
+                icon = 'check_circle';
+                iconColor = 'var(--success)';
+                textColor = 'var(--success)';
+                statusText = 'Done';
+              } else if (isQueued) {
+                icon = 'hourglass_empty';
+                iconColor = 'var(--warning)';
+                textColor = 'var(--warning)';
+                statusText = 'Queued';
+              } else if (isFailed) {
+                icon = 'cancel';
+                iconColor = 'var(--danger)';
+                textColor = 'var(--danger)';
+                statusText = 'Failed';
+              }
+
+              return (
+                <div key={step.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: isIdle ? 0.5 : 1, transition: 'all 0.3s ease' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className={`material-icons ${stepClass}`} style={{ color: iconColor, fontSize: 18 }}>{icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: isRunning || isSuccess || isFailed || isQueued ? 600 : 400, color: textColor }}>{step.label}</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: iconColor }}>{statusText}</span>
+                </div>
+              );
+            })}
+            
+            {processingSteps.localSave === 'success' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'var(--success-light)', borderRadius: 10, animation: 'popIn 0.3s ease' }}>
+                <span className="material-icons" style={{ color: 'var(--success)', fontSize: 18 }}>done_all</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--success)' }}>Completed! Redirecting...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showPicker && (
         <ContactSelectionModal

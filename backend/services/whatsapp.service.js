@@ -68,14 +68,32 @@ class WhatsappService {
 
     // Only include components if the selected template actually requires parameters
     if (templateName === 'cardsync_card_received') {
-      // 7-parameter business card template
-      const greetingName = details.name || contactName || 'Customer';
-      const fullName     = details.fullName || greetingName;
-      const company      = details.company  || '—';
-      const title        = details.title    || '—';
-      const email        = details.email    || '—';
-      const website      = details.website  || '—';
-      const address      = details.address  || '—';
+      // Helper function to resolve parameter values with strict fallback to 'Not Available'
+      const cleanParam = (val) => {
+        if (!val || typeof val !== 'string') return 'Not Available';
+        const trimmed = val.trim();
+        const lower = trimmed.toLowerCase();
+        if (
+          trimmed === '' || 
+          trimmed === '—' || 
+          trimmed === 'N/A' || 
+          lower === 'not provided' || 
+          lower === 'unknown' || 
+          lower === 'unknown company' || 
+          lower === 'unknown name'
+        ) {
+          return 'Not Available';
+        }
+        return trimmed;
+      };
+
+      const greetingName = cleanParam(details.name || contactName);
+      const fullName     = cleanParam(details.fullName || (greetingName !== 'Not Available' ? greetingName : ''));
+      const company      = cleanParam(details.company);
+      const title        = cleanParam(details.title);
+      const email        = cleanParam(details.email);
+      const website      = cleanParam(details.website);
+      const address      = cleanParam(details.address);
 
       payload.template.components = [
         {
@@ -91,6 +109,8 @@ class WhatsappService {
           ]
         }
       ];
+
+      logger.info(`[Debug] WhatsApp template parameters: ${JSON.stringify(payload.template.components[0].parameters, null, 2)}`);
     } else if (templateName !== 'hello_world') {
       // Custom templates: 1-parameter fallback (greeting name)
       payload.template.components = [

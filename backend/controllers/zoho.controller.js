@@ -62,20 +62,27 @@ export const searchLead = async (req, res, next) => {
 export const createLead = async (req, res, next) => {
   try {
     logger.info('✓ Create Lead Request Received');
-    const { Last_Name, Company, Email, Phone } = req.body;
+    const { Last_Name, Company, Email, Phone, Designation, Website, Street } = req.body;
 
     // Validate that Last_Name is present and non-empty
     if (!Last_Name || typeof Last_Name !== 'string' || Last_Name.trim().length === 0) {
       throw new ApiError(400, 'Last_Name is required and cannot be empty.');
     }
 
-    // Call service layer to perform Zoho Lead creation
-    const result = await zohoService.createLead({
+    const leadPayload = {
       Last_Name: Last_Name.trim(),
       Company: Company ? Company.trim() : 'Not Provided', // Zoho Leads usually require Company, default if absent
       Email: Email ? Email.trim() : undefined,
-      Phone: Phone ? Phone.trim() : undefined
-    });
+      Phone: Phone ? Phone.trim() : undefined,
+      Designation: Designation ? Designation.trim() : undefined,
+      Website: Website ? Website.trim() : undefined,
+      Street: Street ? Street.trim() : undefined
+    };
+
+    logger.info(`[Debug] Zoho CRM payload: ${JSON.stringify(leadPayload, null, 2)}`);
+
+    // Call service layer to perform Zoho Lead creation
+    const result = await zohoService.createLead(leadPayload);
 
     const recordResult = result?.data?.[0];
     if (!recordResult || recordResult.status !== 'success') {
