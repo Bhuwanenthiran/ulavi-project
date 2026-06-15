@@ -11,14 +11,14 @@ import { config } from '../config/env.js';
 export const sendWhatsApp = async (req, res, next) => {
   try {
     logger.info('✓ WhatsApp Send Request Received');
-    const { phone, name, fullName, company, title, email, website, address } = req.body;
+    const { phone, name, email, company } = req.body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
       throw new ApiError(400, 'Phone number is required and cannot be empty.');
     }
 
     const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Customer';
-    const details = { name: contactName, fullName, company, title, email, website, address };
+    const details = { name: contactName, email, company };
     const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName, details);
 
     res.status(200).json({
@@ -54,14 +54,14 @@ export const testWhatsAppToken = async (req, res, next) => {
 export const testWhatsAppTemplateController = async (req, res, next) => {
   try {
     logger.info('✓ POST /api/whatsapp/test-template called');
-    const { phone, name, fullName, company, title, email, website, address } = req.body;
+    const { phone, name, email, company } = req.body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
       throw new ApiError(400, 'Phone number is required.');
     }
 
     const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Test User';
-    const details = { name: contactName, fullName, company, title, email, website, address };
+    const details = { name: contactName, email, company };
     
     // Check if token loads successfully
     const tokenExists = !!config.WHATSAPP_ACCESS_TOKEN;

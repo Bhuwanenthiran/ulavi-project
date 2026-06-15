@@ -50,6 +50,28 @@ class WhatsappService {
       throw new Error(errMsg);
     }
 
+    const cleanParam = (val) => {
+      if (!val || typeof val !== 'string') return 'Not Available';
+      const trimmed = val.trim();
+      const lower = trimmed.toLowerCase();
+      if (
+        trimmed === '' || 
+        trimmed === '—' || 
+        trimmed === 'N/A' || 
+        lower === 'not provided' || 
+        lower === 'unknown' || 
+        lower === 'unknown company' || 
+        lower === 'unknown name'
+      ) {
+        return 'Not Available';
+      }
+      return trimmed;
+    };
+
+    const greetingName = cleanParam(details.name || contactName);
+    const email        = cleanParam(details.email);
+    const company      = cleanParam(details.company);
+
     logger.info(`Preparing to send WhatsApp Template "${templateName}" to ${cleanPhone} with contactName "${contactName}"...`);
 
     const url = `https://graph.facebook.com/${apiVersion}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
@@ -67,45 +89,14 @@ class WhatsappService {
     };
 
     // Only include components if the selected template actually requires parameters
-    if (templateName === 'cardsync_card_received') {
-      // Helper function to resolve parameter values with strict fallback to 'Not Available'
-      const cleanParam = (val) => {
-        if (!val || typeof val !== 'string') return 'Not Available';
-        const trimmed = val.trim();
-        const lower = trimmed.toLowerCase();
-        if (
-          trimmed === '' || 
-          trimmed === '—' || 
-          trimmed === 'N/A' || 
-          lower === 'not provided' || 
-          lower === 'unknown' || 
-          lower === 'unknown company' || 
-          lower === 'unknown name'
-        ) {
-          return 'Not Available';
-        }
-        return trimmed;
-      };
-
-      const greetingName = cleanParam(details.name || contactName);
-      const fullName     = cleanParam(details.fullName || (greetingName !== 'Not Available' ? greetingName : ''));
-      const company      = cleanParam(details.company);
-      const title        = cleanParam(details.title);
-      const email        = cleanParam(details.email);
-      const website      = cleanParam(details.website);
-      const address      = cleanParam(details.address);
-
+    if (templateName === 'business_card_received') {
       payload.template.components = [
         {
           type: 'body',
           parameters: [
-            { type: 'text', text: greetingName }, // {{1}} Greeting Name
-            { type: 'text', text: fullName },     // {{2}} Full Name
-            { type: 'text', text: company },      // {{3}} Company
-            { type: 'text', text: title },        // {{4}} Title
-            { type: 'text', text: email },        // {{5}} Email
-            { type: 'text', text: website },      // {{6}} Website
-            { type: 'text', text: address }       // {{7}} Address
+            { type: 'text', text: greetingName }, // {{1}} Contact Name
+            { type: 'text', text: email },        // {{2}} Contact Email
+            { type: 'text', text: company }       // {{3}} Company Name
           ]
         }
       ];
@@ -125,6 +116,14 @@ class WhatsappService {
     // hello_world: no components needed
 
     logger.info(`Outbound Meta API Payload: ${JSON.stringify(payload, null, 2)}`);
+
+    // Log template parameters before sending, as requested (Template Name, Recipient Phone, Name, Email, Company)
+    logger.info(`Sending WhatsApp Message:
+- Template Name: ${templateName}
+- Recipient Phone: ${cleanPhone}
+- Name: ${greetingName}
+- Email: ${email}
+- Company: ${company}`);
 
     try {
       const response = await axios.post(url, payload, {

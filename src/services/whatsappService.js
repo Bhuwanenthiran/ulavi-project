@@ -48,12 +48,8 @@ export const sendWhatsAppMessage = async (contact) => {
       body: JSON.stringify({ 
         phone: contact.phone.trim(),
         name: cleanField(contact.name),
-        fullName: cleanField(contact.name),
-        company: cleanField(contact.company),
-        title: cleanField(contact.title ? contact.title : contact.notes),
         email: cleanField(contact.email),
-        website: cleanField(contact.website),
-        address: cleanField(contact.address)
+        company: cleanField(contact.company)
       }),
     });
 
