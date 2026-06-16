@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useTemplates } from '../context/TemplateContext';
 import ContactSelectionModal from './ContactSelectionModal';
@@ -39,26 +39,24 @@ const stepsConfig = [
   { key: 'localSave',     label: 'Saving locally...' }
 ];
 
-export default function ReviewScreen({ scannedData, previewUrl, onSave, onDiscard, isOffline, isProcessing = false, processingSteps = {}, failedStep = null }) {
+export default function ReviewScreen({ scannedData, previewUrl, onSave, onDiscard, isOffline, isProcessing = false, processingSteps = {}, failedStep = null, folders = [], onCreateFolder }) {
   const [form, setForm] = useState({
     name: '', company: '', email: '', altEmail: '',
     phone: '', altPhone: '', 
     ...scannedData,
   });
-  const generateEmailTemplate = (name) => {
-    return `Hi ${name || ''},
+  const [emailMessage, setEmailMessage] = useState(() => {
+    return `Hello ${scannedData?.name || ''},
 
-Thank you for connecting with us.
+Thank you for connecting with CardSync.
 
-Your contact has been successfully added to our CRM system.
+Your contact details have been saved successfully.
 
-We look forward to staying in touch.
+We look forward to staying connected.
 
 Regards,
-Business Card Scanner Team`;
-  };
-
-  const [emailMessage, setEmailMessage] = useState(() => generateEmailTemplate(scannedData?.name));
+Team CardSync`;
+  });
   const [userEditedEmail, setUserEditedEmail] = useState(false);
   const [showPicker, setShowPicker] = useState(() => {
     const hasMultiple = (scannedData?.phones?.length > 1) || (scannedData?.emails?.length > 1);
@@ -74,7 +72,16 @@ Business Card Scanner Team`;
     setForm(prev => {
       const updated = { ...prev, [key]: value };
       if (key === 'name' && !userEditedEmail) {
-        setEmailMessage(generateEmailTemplate(value));
+        setEmailMessage(`Hello ${value || ''},
+
+Thank you for connecting with CardSync.
+
+Your contact details have been saved successfully.
+
+We look forward to staying connected.
+
+Regards,
+Team CardSync`);
       }
       return updated;
     });
@@ -97,7 +104,16 @@ Business Card Scanner Team`;
         altEmail
       };
       if (!userEditedEmail) {
-        setEmailMessage(generateEmailTemplate(updated.name));
+        setEmailMessage(`Hello ${updated.name || ''},
+
+Thank you for connecting with CardSync.
+
+Your contact details have been saved successfully.
+
+We look forward to staying connected.
+
+Regards,
+Team CardSync`);
       }
       return updated;
     });
@@ -105,6 +121,102 @@ Business Card Scanner Team`;
     console.log('[Debug] Contact Selection Confirmed:', { selectedPhone, selectedEmail, altPhone, altEmail });
     setShowPicker(false);
     addToast('Selections updated!', 'success');
+  };
+
+  const [notes, setNotes] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [speechLang, setSpeechLang] = useState('en-US');
+
+  useEffect(() => {
+    if (!userEditedEmail) {
+      let baseMessage = `Hello ${form.name || ''},
+
+Thank you for connecting with CardSync.
+
+Your contact details have been saved successfully.`;
+
+      if (notes.trim()) {
+        baseMessage += `\n\nMessage from our team:\n${notes.trim()}`;
+      }
+
+      baseMessage += `\n\nWe look forward to staying connected.
+
+Regards,
+Team CardSync`;
+
+      setEmailMessage(baseMessage);
+    }
+  }, [notes, form.name, userEditedEmail]);
+
+  // Helper to run voice recognition
+  const startSpeechRecognition = (targetSetter, listeningStateSetter) => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      addToast('Speech recognition is not supported in this browser.', 'error');
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = speechLang;
+
+    rec.onstart = () => {
+      listeningStateSetter(true);
+      addToast('Listening... Speak now.', 'info');
+    };
+
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      targetSetter(prev => prev ? prev + ' ' + transcript : transcript);
+      listeningStateSetter(false);
+      addToast('Text transcribed!', 'success');
+    };
+
+    rec.onerror = (e) => {
+      console.error(e);
+      listeningStateSetter(false);
+      addToast('Speech recognition failed: ' + e.error, 'error');
+    };
+
+    rec.onend = () => {
+      listeningStateSetter(false);
+    };
+
+    rec.start();
+  };
+
+  const [folderId, setFolderId] = useState(scannedData?.folderId || 'uncategorized');
+  const [showInlineNewFolder, setShowInlineNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  const handleFolderChange = (e) => {
+    const val = e.target.value;
+    if (val === 'create_new') {
+      setShowInlineNewFolder(true);
+    } else {
+      setFolderId(val);
+      setShowInlineNewFolder(false);
+    }
+  };
+
+  const handleInlineFolderSubmit = async (e) => {
+    e.preventDefault();
+    if (!newFolderName.trim()) {
+      addToast('Folder name cannot be empty.', 'error');
+      return;
+    }
+    try {
+      const newFolder = await onCreateFolder(newFolderName.trim());
+      if (newFolder && newFolder.id) {
+        setFolderId(newFolder.id);
+        setShowInlineNewFolder(false);
+        setNewFolderName('');
+        addToast('Folder created and selected!', 'success');
+      }
+    } catch (err) {
+      addToast('Failed to create folder', 'error');
+    }
   };
 
   const handleSave = () => {
@@ -119,7 +231,21 @@ Business Card Scanner Team`;
       setTimeout(() => setErrors({}), 500); // Clear shake animation
       return;
     }
-    onSave({ ...form, emailMessage });
+
+    if (notes.length > 5000) {
+      addToast('Notes exceed the maximum character limit of 5000 characters.', 'error');
+      return;
+    }
+    
+    // Save selected folderId (null if uncategorized)
+    const finalFolderId = folderId === 'uncategorized' ? null : folderId;
+
+    onSave({
+      ...form,
+      folderId: finalFolderId,
+      emailMessage: emailMessage,
+      notes: notes.trim()
+    });
   };
 
   return (
@@ -217,6 +343,137 @@ Business Card Scanner Team`;
             </div>
           );
         })}
+
+        {/* Select Folder Dropdown */}
+        <div className="form-group" style={{ marginTop: 24, marginBottom: showInlineNewFolder ? 12 : 0 }}>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="form-input"
+              value={folderId}
+              onChange={handleFolderChange}
+              style={{ appearance: 'none', paddingRight: '40px' }}
+            >
+              <option value="uncategorized">Uncategorized</option>
+              {folders.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+              <option value="create_new" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>+ Create New Folder...</option>
+            </select>
+            <label className="form-label" style={{ top: '-10px', left: '12px', fontSize: '11px', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Select Folder/Event</label>
+            <span className="material-icons" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-secondary)' }}>expand_more</span>
+          </div>
+        </div>
+
+        {/* Inline New Folder Input */}
+        {showInlineNewFolder && (
+          <form onSubmit={handleInlineFolderSubmit} style={{ display: 'flex', gap: 8, marginTop: 12, animation: 'popIn 0.3s ease' }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, padding: '10px 14px', fontSize: 14 }}
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              placeholder="Enter new folder name"
+              autoFocus
+            />
+            <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px', borderRadius: 'var(--radius-input)', fontSize: 13 }}>Add</button>
+            <button type="button" className="btn btn-outline" style={{ padding: '10px 16px', borderRadius: 'var(--radius-input)', fontSize: 13 }} onClick={() => setShowInlineNewFolder(false)}>Cancel</button>
+          </form>
+        )}
+      </div>
+
+      {/* Notes & Remarks Card */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <span className="material-icons" style={{ color: 'var(--primary)' }}>notes</span>
+            Notes & Remarks
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="material-icons" style={{ fontSize: 16, color: 'var(--text-secondary)' }}>language</span>
+            <select
+              value={speechLang}
+              onChange={e => setSpeechLang(e.target.value)}
+              style={{ border: 'none', background: 'none', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, outline: 'none' }}
+            >
+              <option value="en-US">English (US)</option>
+              <option value="en-IN">English (India)</option>
+              <option value="es-ES">Español</option>
+              <option value="fr-FR">Français</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Notes & Remarks textarea */}
+        <div style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <label style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)' }}>
+              <span className="material-icons" style={{ fontSize: 16 }}>edit_note</span>
+              Notes / Remarks
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(notes);
+                  addToast('Copied notes to clipboard', 'success');
+                }}
+                disabled={!notes}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+                title="Copy Note"
+              >
+                <span className="material-icons" style={{ fontSize: 18 }}>content_copy</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNotes('')}
+                disabled={!notes}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--danger)', display: 'flex', alignItems: 'center' }}
+                title="Clear Note"
+              >
+                <span className="material-icons" style={{ fontSize: 18 }}>clear</span>
+              </button>
+            </div>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <textarea
+              className="form-input"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Add remarks, congratulations, follow-up details, or personalized messages..."
+              style={{ minHeight: 120, paddingRight: '44px', fontSize: 13, resize: 'vertical' }}
+              maxLength={5000}
+            />
+            <button
+              type="button"
+              onClick={() => startSpeechRecognition(setNotes, setIsListening)}
+              style={{
+                position: 'absolute',
+                right: 8,
+                bottom: 8,
+                background: isListening ? 'var(--danger-light)' : 'var(--primary-light)',
+                color: isListening ? 'var(--danger)' : 'var(--primary)',
+                border: 'none',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Voice Input"
+            >
+              <span className="material-icons" style={{ fontSize: 18, animation: isListening ? 'pulse 1.5s infinite' : 'none' }}>
+                {isListening ? 'mic_off' : 'mic'}
+              </span>
+            </button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+            <span>Dictate or type your note</span>
+            <span>{notes.length} / 5000</span>
+          </div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>

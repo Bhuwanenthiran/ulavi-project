@@ -50,7 +50,8 @@ export default function ContactsScreen({ contacts, onDelete, onUpdate, onGoToSca
     (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.phone || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.website || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.address || '').toLowerCase().includes(search.toLowerCase())
+    (c.address || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.notes || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const StatusBadge = ({ status }) => {
@@ -262,14 +263,29 @@ export default function ContactsScreen({ contacts, onDelete, onUpdate, onGoToSca
                   <span style={{ fontSize: 14, lineHeight: 1.4 }}>{selectedContact.address}</span>
                 </div>
               )}
-              {selectedContact.notes && (
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
-                  <span className="material-icons" style={{ color: 'var(--text-secondary)', fontSize: 20 }}>notes</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{selectedContact.notes}</span>
+              {/* Notes / Remarks Display & Edit */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>notes</span> 📝 Notes / Remarks
+                  </span>
                 </div>
-              )}
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-                Scanned on: {new Date(selectedContact.scannedAt || Date.now()).toLocaleString()}
+                <textarea
+                  className="form-input"
+                  style={{ fontSize: 13, minHeight: 80, padding: 8, resize: 'vertical' }}
+                  defaultValue={selectedContact.notes || ''}
+                  placeholder="Add remarks, congratulations, follow-up details, or personalized messages..."
+                  maxLength={5000}
+                  onBlur={async (e) => {
+                    const val = e.target.value.trim();
+                    if (val !== (selectedContact.notes || '')) {
+                      const updated = { ...selectedContact, notes: val, updatedAt: new Date().toISOString() };
+                      setSelectedContact(updated);
+                      await onUpdate(updated);
+                      addToast('Notes / Remarks updated', 'success');
+                    }
+                  }}
+                />
               </div>
               {selectedContact.syncedToZoho && selectedContact.zohoLeadId && (
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8, fontSize: 13 }}>

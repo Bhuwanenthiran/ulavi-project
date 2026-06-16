@@ -37,11 +37,11 @@ export default function BottomNav({ activePage, setPage }) {
       </button>
 
       <button
-        className={`nav-item${activePage === 'templates' ? ' active' : ''}`}
-        onClick={() => setPage('templates')}
+        className={`nav-item${activePage === 'folders' ? ' active' : ''}`}
+        onClick={() => setPage('folders')}
       >
-        <span className="material-icons">tune</span>
-        <span className="nav-label">Settings</span>
+        <span className="material-icons">folder</span>
+        <span className="nav-label">Folders</span>
       </button>
     </nav>
   );

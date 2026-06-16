@@ -1,19 +1,22 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'cardconnect-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
 export const initDB = async () => {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion, newVersion, transaction) {
         if (!db.objectStoreNames.contains('contacts')) {
           db.createObjectStore('contacts', { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains('queue')) {
           db.createObjectStore('queue', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('folders')) {
+          db.createObjectStore('folders', { keyPath: 'id' });
         }
       },
     });
@@ -34,6 +37,21 @@ export const saveContactToDB = async (contact) => {
 export const deleteContactFromDB = async (id) => {
   const db = await initDB();
   return db.delete('contacts', id);
+};
+
+export const getFoldersFromDB = async () => {
+  const db = await initDB();
+  return db.getAll('folders');
+};
+
+export const saveFolderToDB = async (folder) => {
+  const db = await initDB();
+  return db.put('folders', folder);
+};
+
+export const deleteFolderFromDB = async (id) => {
+  const db = await initDB();
+  return db.delete('folders', id);
 };
 
 export const addActionToQueue = async (action) => {

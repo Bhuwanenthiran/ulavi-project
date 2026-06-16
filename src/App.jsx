@@ -7,9 +7,9 @@ import BottomNav from './components/BottomNav';
 import ScanScreen from './components/ScanScreen';
 import ReviewScreen from './components/ReviewScreen';
 import ContactsScreen from './components/ContactsScreen';
-import TemplatesScreen from './components/TemplatesScreen';
+import FoldersScreen from './components/FoldersScreen';
 import { useTemplates } from './context/TemplateContext';
-import { initDB, getContactsFromDB, saveContactToDB, deleteContactFromDB, getQueue } from './storage/db';
+import { initDB, getContactsFromDB, saveContactToDB, deleteContactFromDB, getQueue, getFoldersFromDB, saveFolderToDB, deleteFolderFromDB } from './storage/db';
 import { enqueueAction, processQueue } from './queue/offlineQueue';
 import DuplicateModal from './components/duplicate/DuplicateModal';
 import { findDuplicates } from './utils/duplicateCheck';
@@ -37,6 +37,7 @@ function App() {
   const [duplicates, setDuplicates] = useState(null);
   const [pendingNewContact, setPendingNewContact] = useState(null);
   const [isCheckingZoho, setIsCheckingZoho] = useState(false);
+  const [folders, setFolders] = useState([]);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingSteps, setProcessingSteps] = useState({
@@ -135,9 +136,27 @@ function App() {
         }
         dbContacts = initialContacts;
       }
+      // Load Folders
+      let dbFolders = await getFoldersFromDB();
+      if (dbFolders.length === 0) {
+        const defaultFolders = [
+          { id: 'tech_conf_2026', name: 'Tech Conference 2026', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: 'hackathon', name: 'Hackathon', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: 'client_meeting', name: 'Client Meeting', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: 'startup_expo', name: 'Startup Expo', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: 'workshop', name: 'Workshop', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        ];
+        for (const folder of defaultFolders) {
+          await saveFolderToDB(folder);
+        }
+        dbFolders = defaultFolders;
+      }
+      setFolders(dbFolders);
+
       await updateQueueCount();
 
       // Auto-sync on startup if online
+      const q = await getQueue();
       if (navigator.onLine && q.length > 0) {
         addToast('Syncing queued contacts...', 'info');
         setIsSyncing(true);
@@ -462,6 +481,10 @@ function App() {
         const finalContact = {
           ...activeForm,
           id: activeForm.id || Date.now(),
+          folderId: activeForm.folderId || null,
+          notes: activeForm.notes || '',
+          createdAt: activeForm.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           status: activeForm.status || 'new',
           whatsappStatus: waStatus,
           emailStatus: emailStatus,
@@ -655,11 +678,51 @@ function App() {
     setIsSyncing(false);
   };
 
+  const handleCreateFolder = async (name) => {
+    const newFolder = {
+      id: 'folder_' + Date.now(),
+      name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveFolderToDB(newFolder);
+    setFolders(prev => [...prev, newFolder]);
+    addToast(`Folder "${name}" created`, 'success');
+    return newFolder;
+  };
+
+  const handleUpdateFolder = async (id, name) => {
+    const folder = folders.find(f => f.id === id);
+    if (!folder) return;
+    const updated = {
+      ...folder,
+      name,
+      updatedAt: new Date().toISOString()
+    };
+    await saveFolderToDB(updated);
+    setFolders(prev => prev.map(f => f.id === id ? updated : f));
+    addToast('Folder name updated', 'success');
+  };
+
+  const handleDeleteFolder = async (id) => {
+    await deleteFolderFromDB(id);
+    setFolders(prev => prev.filter(f => f.id !== id));
+    
+    // For contacts inside this folder, reset folderId to null (meaning Uncategorized)
+    const contactsInFolder = contacts.filter(c => c.folderId === id);
+    for (const contact of contactsInFolder) {
+      const updatedContact = { ...contact, folderId: null };
+      await saveContactToDB(updatedContact);
+    }
+    setContacts(prev => prev.map(c => c.folderId === id ? { ...c, folderId: null } : c));
+    addToast('Folder deleted. Contacts moved to Uncategorized', 'success');
+  };
+
   const PAGE_TITLE = {
     scan: 'CardConnect AI',
     review: 'Review Contact',
     contacts: 'All Contacts',
-    templates: 'Templates',
+    folders: 'Folders',
   };
 
   if (showSplash) {
@@ -739,6 +802,8 @@ function App() {
                 isProcessing={isProcessing}
                 processingSteps={processingSteps}
                 failedStep={failedStep}
+                folders={folders}
+                onCreateFolder={handleCreateFolder}
                 key="review"
               />
             )}
@@ -752,8 +817,18 @@ function App() {
                 key="contacts"
               />
             )}
-            {page === 'templates' && (
-              <TemplatesScreen key="templates" />
+            {page === 'folders' && (
+              <FoldersScreen
+                contacts={contacts}
+                folders={folders}
+                onCreateFolder={handleCreateFolder}
+                onUpdateFolder={handleUpdateFolder}
+                onDeleteFolder={handleDeleteFolder}
+                onDeleteContact={handleDeleteContact}
+                onUpdateContact={handleUpdateContact}
+                onRetryDispatch={handleRetryContactDispatch}
+                key="folders"
+              />
             )}
           </main>
 
