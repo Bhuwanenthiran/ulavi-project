@@ -36,7 +36,7 @@ class WhatsappService {
     }
 
     // ── 2. Runtime values (logged before any API call) ──────────────────────
-    const templateName = WHATSAPP_TEMPLATE_NAME || 'card_connect_ai';
+    const templateName = WHATSAPP_TEMPLATE_NAME || 'cardsync_contact_saved';
     const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en';
     const apiVersion   = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
 
@@ -73,7 +73,7 @@ class WhatsappService {
     const greetingName = resolveContactName(contactName);
 
     // ── 5. Build exact payload ───────────────────────────────────────────────
-    // Template: card_connect_ai  |  Language: en  |  Body params: 1 ({{1}} = name)
+    // Template: cardsync_contact_saved  |  Language: en  |  Body params: 1 ({{1}} = name)
     const payload = {
       messaging_product: 'whatsapp',
       to: cleanPhone,
