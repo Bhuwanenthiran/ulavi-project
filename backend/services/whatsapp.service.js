@@ -16,9 +16,9 @@ class WhatsappService {
    * @param {string} phone - Recipient phone number
    * @returns {Promise<Object>} Meta API response details
    */
-   async sendWhatsAppTemplate(phone, contactName = 'Customer', details = {}) {
-    const { 
-      WHATSAPP_ACCESS_TOKEN, 
+   async sendWhatsAppTemplate(phone, contactName = 'Valued Customer') {
+    const {
+      WHATSAPP_ACCESS_TOKEN,
       WHATSAPP_PHONE_NUMBER_ID,
       WHATSAPP_GRAPH_API_VERSION,
       WHATSAPP_TEMPLATE_NAME,
@@ -26,128 +26,85 @@ class WhatsappService {
       WHATSAPP_BUSINESS_PHONE
     } = config;
 
-    // Validate configuration existence
+    // ── 1. Validate required configuration ──────────────────────────────────
     if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
       const missing = [];
       if (!WHATSAPP_ACCESS_TOKEN) missing.push('WHATSAPP_ACCESS_TOKEN');
       if (!WHATSAPP_PHONE_NUMBER_ID) missing.push('WHATSAPP_PHONE_NUMBER_ID');
-
-      logger.error(`Cannot send WhatsApp template. Configuration is missing in backend .env: ${missing.join(', ')}`);
+      logger.error(`[WhatsApp] Missing config: ${missing.join(', ')}`);
       throw new Error(`WhatsApp API configuration is missing: ${missing.join(', ')}`);
     }
 
-    const templateName = WHATSAPP_TEMPLATE_NAME;
+    // ── 2. Runtime values (logged before any API call) ──────────────────────
+    const templateName = WHATSAPP_TEMPLATE_NAME || 'card_connect_ai';
     const languageCode = WHATSAPP_TEMPLATE_LANGUAGE_CODE || 'en';
-    const apiVersion = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
-    
-    const cleanPhone = phone.trim().replace(/[+\s-]/g, ''); // Extract digits only
-    const cleanBusinessPhone = WHATSAPP_BUSINESS_PHONE ? WHATSAPP_BUSINESS_PHONE.trim().replace(/[+\s-]/g, '') : '';
+    const apiVersion   = WHATSAPP_GRAPH_API_VERSION || 'v25.0';
 
-    // Verify recipient is different from the business sender phone
+    logger.info('[WhatsApp] ── PRE-FLIGHT AUDIT ──────────────────────────────');
+    logger.info(`[WhatsApp] WHATSAPP_TEMPLATE_NAME         = ${templateName}`);
+    logger.info(`[WhatsApp] WHATSAPP_TEMPLATE_LANGUAGE_CODE= ${languageCode}`);
+    logger.info(`[WhatsApp] WHATSAPP_PHONE_NUMBER_ID       = ${WHATSAPP_PHONE_NUMBER_ID}`);
+
+    // ── 3. Normalize recipient phone to E.164 (digits only) ─────────────────
+    const cleanPhone         = String(phone).trim().replace(/[^0-9]/g, '');
+    const cleanBusinessPhone = WHATSAPP_BUSINESS_PHONE
+      ? String(WHATSAPP_BUSINESS_PHONE).trim().replace(/[^0-9]/g, '')
+      : '';
+
+    if (!cleanPhone) {
+      throw new Error('Recipient phone number is empty after normalization.');
+    }
     if (cleanPhone === cleanBusinessPhone) {
-      const errMsg = 'Cannot send a WhatsApp template message to the business sender number.';
-      logger.error(errMsg);
-      throw new Error(errMsg);
+      throw new Error('Cannot send WhatsApp template to the business sender number.');
     }
 
-    const cleanParam = (val) => {
-      if (!val || typeof val !== 'string') return 'Not Available';
-      const trimmed = val.trim();
-      const lower = trimmed.toLowerCase();
+    // ── 4. Resolve contact name — exactly ONE parameter for {{1}} ────────────
+    const resolveContactName = (raw) => {
+      if (!raw || typeof raw !== 'string') return 'Valued Customer';
+      const t = raw.trim();
+      const l = t.toLowerCase();
       if (
-        trimmed === '' || 
-        trimmed === '—' || 
-        trimmed === 'N/A' || 
-        lower === 'not provided' || 
-        lower === 'unknown' || 
-        lower === 'unknown company' || 
-        lower === 'unknown name'
-      ) {
-        return 'Not Available';
-      }
-      return trimmed;
+        t === '' || t === '—' || t === 'N/A' ||
+        l === 'not provided' || l === 'not available' ||
+        l === 'unknown' || l === 'unknown name' || l === 'unknown company'
+      ) return 'Valued Customer';
+      return t;
     };
+    const greetingName = resolveContactName(contactName);
 
-    const greetingName = cleanParam(details.name || contactName);
-    const email        = cleanParam(details.email);
-    const company      = cleanParam(details.company);
-
-    logger.info(`Preparing to send WhatsApp Template "${templateName}" to ${cleanPhone} with contactName "${contactName}"...`);
-
-    const url = `https://graph.facebook.com/${apiVersion}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-    
+    // ── 5. Build exact payload ───────────────────────────────────────────────
+    // Template: card_connect_ai  |  Language: en  |  Body params: 1 ({{1}} = name)
     const payload = {
       messaging_product: 'whatsapp',
       to: cleanPhone,
       type: 'template',
       template: {
         name: templateName,
-        language: {
-          code: languageCode
-        }
+        language: { code: languageCode },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: greetingName }   // {{1}} → contact name
+            ]
+          }
+        ]
       }
     };
 
-    // Define template parameters based on template name
-    let parameters = [];
-    if (templateName === 'hello_world') {
-      parameters = [];
-    } else if (
-      templateName === 'cardsync_contact_saved' || 
-      templateName === 'card_connect_ai' || 
-      templateName === '3p_direct_integration_test_template'
-    ) {
-      parameters = [
-        { type: 'text', text: greetingName } // {{1}} Contact Name
-      ];
-    } else if (templateName === 'cardsync_card_received') {
-      parameters = [
-        { type: 'text', text: greetingName },                     // {{1}}
-        { type: 'text', text: cleanParam(details.name || contactName) }, // {{2}}
-        { type: 'text', text: cleanParam(details.company) },      // {{3}}
-        { type: 'text', text: cleanParam(details.title) },        // {{4}}
-        { type: 'text', text: cleanParam(details.email) },        // {{5}}
-        { type: 'text', text: cleanParam(details.website) },      // {{6}}
-        { type: 'text', text: cleanParam(details.address) }       // {{7}}
-      ];
-    } else {
-      // Default to original 3 parameters for other/unknown templates
-      parameters = [
-        { type: 'text', text: greetingName }, // {{1}} Contact Name
-        { type: 'text', text: email },        // {{2}} Contact Email
-        { type: 'text', text: company }       // {{3}} Company Name
-      ];
-    }
+    const url = `https://graph.facebook.com/${apiVersion}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
-    if (parameters.length > 0) {
-      payload.template.components = [
-        {
-          type: 'body',
-          parameters: parameters
-        }
-      ];
-      logger.info(`[Debug] WhatsApp template parameters: ${JSON.stringify(payload.template.components[0].parameters, null, 2)}`);
-    }
+    // ── 6. Pre-flight log ────────────────────────────────────────────────────
+    logger.info('[WhatsApp] ── PRE-CALL DETAILS ──────────────────────────────');
+    logger.info(`[WhatsApp] Template name   : ${templateName}`);
+    logger.info(`[WhatsApp] Language code   : ${languageCode}`);
+    logger.info(`[WhatsApp] Recipient phone : ${cleanPhone}`);
+    logger.info(`[WhatsApp] Contact name ({{1}}): ${greetingName}`);
+    logger.info(`[WhatsApp] Body param count: 1`);
+    logger.info(`[WhatsApp] Graph API URL   : ${url}`);
+    logger.info(`[WhatsApp] Payload:\n${JSON.stringify(payload, null, 2)}`);
 
-    const numParams = payload.template.components?.[0]?.parameters?.length || 0;
-    const paramValues = payload.template.components?.[0]?.parameters?.map(p => p.text) || [];
-
-    // Log before sending:
-    // - Template Name
-    // - Language
-    // - Phone Number ID
-    // - Recipient
-    // - Number of Parameters
-    // - Parameter Values
-    logger.info(`Sending WhatsApp Message Details:
-- Template Name: ${templateName}
-- Language Code: ${languageCode}
-- Recipient Phone: ${cleanPhone}
-- Number of Parameters: ${numParams}
-- Parameter Values: ${JSON.stringify(paramValues)}`);
-
-    logger.info(`Outbound Meta API Payload: ${JSON.stringify(payload, null, 2)}`);
-
+    // ── 7. Call Meta API ─────────────────────────────────────────────────────
     try {
       const response = await axios.post(url, payload, {
         headers: {
@@ -156,38 +113,36 @@ class WhatsappService {
         }
       });
 
-      const httpStatus = response.status;
-      const responseBody = response.data;
-      const messageId = responseBody.messages?.[0]?.id || 'N/A';
+      const httpStatus    = response.status;
+      const responseBody  = response.data;
+      const messageId     = responseBody.messages?.[0]?.id || 'N/A';
       const messageStatus = responseBody.messages?.[0]?.message_status || 'accepted';
 
-      logger.info('✓ WhatsApp template dispatch succeeded.');
-      logger.info(`Telemetry - Template Name: ${templateName}`);
-      logger.info(`Telemetry - Phone Number ID: ${WHATSAPP_PHONE_NUMBER_ID}`);
-      logger.info(`Telemetry - Recipient: ${cleanPhone}`);
-      logger.info(`Telemetry - HTTP Status: ${httpStatus}`);
-      logger.info(`Telemetry - Response Body: ${JSON.stringify(responseBody)}`);
-      logger.info(`Telemetry - Message ID: ${messageId}`);
-      logger.info(`Telemetry - Message Status: ${messageStatus}`);
+      logger.info('[WhatsApp] ── META RESPONSE ─────────────────────────────────');
+      logger.info(`[WhatsApp] HTTP Status    : ${httpStatus}`);
+      logger.info(`[WhatsApp] Message ID     : ${messageId}`);
+      logger.info(`[WhatsApp] Message Status : ${messageStatus}`);
+      logger.info(`[WhatsApp] Full response  : ${JSON.stringify(responseBody)}`);
 
       return { payload, response: responseBody };
+
     } catch (error) {
-      const httpStatus = error.response?.status || 'N/A';
+      const httpStatus   = error.response?.status || 'N/A';
       const responseBody = error.response?.data || {};
-      const errMsg = error.response?.data
+      const errMsg       = error.response?.data
         ? JSON.stringify(error.response.data)
         : error.message;
 
-      logger.error('✗ WhatsApp template dispatch failed.');
-      logger.error(`Telemetry - Template Name: ${templateName}`);
-      logger.error(`Telemetry - Phone Number ID: ${WHATSAPP_PHONE_NUMBER_ID}`);
-      logger.error(`Telemetry - Recipient: ${cleanPhone}`);
-      logger.error(`Telemetry - HTTP Status: ${httpStatus}`);
-      logger.error(`Telemetry - Response Body: ${JSON.stringify(responseBody)}`);
-      logger.error(`Telemetry - Error Message: ${errMsg}`);
+      logger.error('[WhatsApp] ── META ERROR RESPONSE ───────────────────────────');
+      logger.error(`[WhatsApp] HTTP Status     : ${httpStatus}`);
+      logger.error(`[WhatsApp] Template Name   : ${templateName}`);
+      logger.error(`[WhatsApp] Language Code   : ${languageCode}`);
+      logger.error(`[WhatsApp] Phone Number ID : ${WHATSAPP_PHONE_NUMBER_ID}`);
+      logger.error(`[WhatsApp] Recipient       : ${cleanPhone}`);
+      logger.error(`[WhatsApp] Full Meta error : ${errMsg}`);
 
       const customError = new Error(`Meta API error: ${errMsg}`);
-      customError.payload = payload;
+      customError.payload  = payload;
       customError.response = responseBody;
       throw customError;
     }

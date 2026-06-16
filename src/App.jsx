@@ -439,13 +439,10 @@ function App() {
               throw new Error(waResult.error || 'Meta API returned failure');
             }
           } catch (err) {
-            console.error('WhatsApp send error:', err);
+            console.error('WhatsApp send error (continuing save flow):', err);
             localSteps = { ...localSteps, whatsappSend: 'failed' };
             setProcessingSteps(localSteps);
-            setFailedStep('whatsappSend');
-            setIsProcessing(false);
-            addToast(err.message || 'WhatsApp sending failed.', 'error');
-            return;
+            addToast(err.message || 'WhatsApp sending failed, but contact save is proceeding.', 'warning');
           }
         }
       }

@@ -11,26 +11,30 @@ import { config } from '../config/env.js';
 export const sendWhatsApp = async (req, res, next) => {
   try {
     logger.info('✓ WhatsApp Send Request Received');
-    const { phone, name, email, company } = req.body;
+    const { phone, name } = req.body;
 
     if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
       throw new ApiError(400, 'Phone number is required and cannot be empty.');
     }
 
-    const contactName = (name && typeof name === 'string' && name.trim().length > 0) ? name.trim() : 'Customer';
-    const details = { name: contactName, email, company };
-    const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName, details);
+    // {{1}} = contact name; fall back to "Valued Customer" if missing/blank
+    const contactName = (name && typeof name === 'string' && name.trim().length > 0)
+      ? name.trim()
+      : 'Valued Customer';
+
+    const result = await whatsappService.sendWhatsAppTemplate(phone.trim(), contactName);
 
     res.status(200).json({
       success: true,
-      message: 'WhatsApp template sent successfully',
-      data: result.response,
-      payload: result.payload
+      message: 'WhatsApp message sent successfully',
+      recipient: result.payload?.to,
+      messageId: result.response?.messages?.[0]?.id || null
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 /**
  * Test WhatsApp Token Controller

@@ -14,30 +14,30 @@ import API_BASE_URL from '../config/api';
 export const sendWhatsAppMessage = async (contact) => {
   console.log('✓ WhatsApp Send Started', contact);
 
-  // Validate presence of phone number
-  if (!contact?.phone || typeof contact.phone !== 'string' || contact.phone.trim().length === 0) {
-    const error = 'Cannot send WhatsApp: phone number is missing.';
+  const rawPhone = contact?.phone || '';
+  const normalizedPhone = rawPhone.trim().replace(/[^0-9]/g, '');
+
+  if (!normalizedPhone) {
+    const error = 'Cannot send WhatsApp: phone number is missing or invalid.';
     console.error('✓ WhatsApp Send Failed:', error);
     return { success: false, error };
   }
 
-  const cleanField = (val) => {
-    if (!val || typeof val !== 'string') return 'Not Available';
-    const trimmed = val.trim();
-    const lower = trimmed.toLowerCase();
+  const resolveContactName = (raw) => {
+    if (!raw || typeof raw !== 'string') return 'Valued Customer';
+    const t = raw.trim();
+    const l = t.toLowerCase();
     if (
-      trimmed === '' || 
-      trimmed === '—' || 
-      trimmed === 'N/A' || 
-      lower === 'not provided' || 
-      lower === 'unknown' || 
-      lower === 'unknown company' || 
-      lower === 'unknown name'
+      t === '' || t === '—' || t === 'N/A' ||
+      l === 'not provided' || l === 'not available' ||
+      l === 'unknown' || l === 'unknown name' || l === 'unknown company'
     ) {
-      return 'Not Available';
+      return 'Valued Customer';
     }
-    return trimmed;
+    return t;
   };
+
+  const contactName = resolveContactName(contact.name);
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/whatsapp/send`, {
@@ -46,10 +46,8 @@ export const sendWhatsAppMessage = async (contact) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        phone: contact.phone.trim(),
-        name: cleanField(contact.name),
-        email: cleanField(contact.email),
-        company: cleanField(contact.company)
+        phone: normalizedPhone,
+        name: contactName
       }),
     });
 
@@ -62,9 +60,10 @@ export const sendWhatsAppMessage = async (contact) => {
     }
 
     console.log('✓ WhatsApp Send Success', data);
-    return { success: true, data: data.data };
+    return { success: true, data };
   } catch (error) {
     console.error('✓ WhatsApp Send Failed:', error.message);
     return { success: false, error: error.message };
   }
 };
+
