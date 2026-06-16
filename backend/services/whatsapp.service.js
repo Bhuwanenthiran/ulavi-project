@@ -88,19 +88,44 @@ class WhatsappService {
       }
     };
 
-    // Only include components if the selected template actually requires parameters
-    if (templateName !== 'hello_world') {
+    // Define template parameters based on template name
+    let parameters = [];
+    if (templateName === 'hello_world') {
+      parameters = [];
+    } else if (
+      templateName === 'cardsync_contact_saved' || 
+      templateName === 'card_connect_ai' || 
+      templateName === '3p_direct_integration_test_template'
+    ) {
+      parameters = [
+        { type: 'text', text: greetingName } // {{1}} Contact Name
+      ];
+    } else if (templateName === 'cardsync_card_received') {
+      parameters = [
+        { type: 'text', text: greetingName },                     // {{1}}
+        { type: 'text', text: cleanParam(details.name || contactName) }, // {{2}}
+        { type: 'text', text: cleanParam(details.company) },      // {{3}}
+        { type: 'text', text: cleanParam(details.title) },        // {{4}}
+        { type: 'text', text: cleanParam(details.email) },        // {{5}}
+        { type: 'text', text: cleanParam(details.website) },      // {{6}}
+        { type: 'text', text: cleanParam(details.address) }       // {{7}}
+      ];
+    } else {
+      // Default to original 3 parameters for other/unknown templates
+      parameters = [
+        { type: 'text', text: greetingName }, // {{1}} Contact Name
+        { type: 'text', text: email },        // {{2}} Contact Email
+        { type: 'text', text: company }       // {{3}} Company Name
+      ];
+    }
+
+    if (parameters.length > 0) {
       payload.template.components = [
         {
           type: 'body',
-          parameters: [
-            { type: 'text', text: greetingName }, // {{1}} Contact Name
-            { type: 'text', text: email },        // {{2}} Contact Email
-            { type: 'text', text: company }       // {{3}} Company Name
-          ]
+          parameters: parameters
         }
       ];
-
       logger.info(`[Debug] WhatsApp template parameters: ${JSON.stringify(payload.template.components[0].parameters, null, 2)}`);
     }
 
