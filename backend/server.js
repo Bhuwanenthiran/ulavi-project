@@ -29,6 +29,35 @@ app.use('/api/zoho', zohoRoutes); // GET /api/zoho/search, POST /api/zoho/create
 app.use('/api/whatsapp', whatsappRoutes); // POST /api/whatsapp/send
 app.use('/oauth', oauthRoutes);   // GET /oauth/callback  (Zoho OAuth redirect)
 
+app.get('/debug-routes', (req, res) => {
+  const routes = [];
+  const inspectRoutes = (stack, prefix = '') => {
+    stack.forEach(layer => {
+      if (layer.route) {
+        const methods = Object.keys(layer.route.methods).join(',').toUpperCase();
+        routes.push(`${methods} ${prefix}${layer.route.path}`);
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        let routePrefix = layer.regexp.source
+          .replace('\\/?(?=\\/|$)', '')
+          .replace('^\\/', '/')
+          .replace('^', '')
+          .replace('\\/', '/');
+        // Handle cleaning regex patterns for simple prefixes
+        if (routePrefix === '/api/whatsapp') routePrefix = '/api/whatsapp';
+        if (routePrefix === '/api/zoho') routePrefix = '/api/zoho';
+        if (routePrefix === '/oauth') routePrefix = '/oauth';
+        inspectRoutes(layer.handle.stack, prefix + routePrefix);
+      }
+    });
+  };
+  inspectRoutes(app._router.stack);
+  res.json({
+    whatsappRoutesMounted: true,
+    hasTestTemplateRoute: routes.some(r => r.includes('/api/whatsapp/test-template')),
+    routes
+  });
+});
+
 // Catch-all for non-matching routes (404 Not Found)
 app.use(routeNotFound);
 
