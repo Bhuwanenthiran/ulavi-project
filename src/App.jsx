@@ -18,6 +18,9 @@ import API_BASE_URL from './config/api';
 import { createZohoLead } from './services/zohoApi';
 import { sendEmail } from './services/emailService';
 import { sendWhatsAppMessage } from './services/whatsappService';
+import { isFirebaseAvailable } from './config/firebase';
+import { syncContactToFirebase, deleteContactFromFirebase, syncFolderToFirebase, deleteFolderFromFirebase } from './services/firebaseService';
+import { performStartupSync, triggerFirebaseSync, queueFirebaseDeletion, registerSyncCallback } from './services/firebaseSyncManager';
 
 const AVATAR_COLORS = ['#2563EB', '#D97706', '#16A34A', '#64748B', '#DC2626', '#7C3AED', '#DB2777'];
 
@@ -154,6 +157,17 @@ function App() {
       setFolders(dbFolders);
 
       await updateQueueCount();
+
+      // Register Firebase sync updates
+      registerSyncCallback(async () => {
+        const updatedContacts = await getContactsFromDB();
+        setContacts(prepareContacts(updatedContacts).sort((a, b) => b.id - a.id));
+        const updatedFolders = await getFoldersFromDB();
+        setFolders(updatedFolders);
+      });
+
+      // Run background Firebase startup sync
+      performStartupSync();
 
       // Auto-sync on startup if online
       const q = await getQueue();
@@ -534,6 +548,9 @@ function App() {
           const localSaveEndTime = performance.now();
           console.log(`[TimeLog] Local Save End. Duration: ${(localSaveEndTime - localSaveStartTime).toFixed(2)}ms`);
 
+          // Trigger Firebase cloud sync in the background
+          triggerFirebaseSync();
+
         } catch (err) {
           console.error('Local save error:', err);
           localSteps = { ...localSteps, localSave: 'failed' };
@@ -634,11 +651,27 @@ function App() {
   const handleDeleteContact = async (id) => {
     await deleteContactFromDB(id);
     setContacts(prev => prev.filter(c => c.id !== id));
+
+    // Firebase: delete from Firestore (or queue if offline)
+    if (isFirebaseAvailable()) {
+      if (navigator.onLine) {
+        deleteContactFromFirebase(String(id)).catch(err => {
+          console.warn('[Firebase] Failed to delete contact, queuing for retry:', err);
+          queueFirebaseDeletion(String(id), 'contact');
+        });
+      } else {
+        queueFirebaseDeletion(String(id), 'contact');
+      }
+    }
   };
 
   const handleUpdateContact = async (updated) => {
-    await saveContactToDB(updated);
-    setContacts(prev => prev.map(c => c.id === updated.id ? updated : c));
+    const updatedWithTimestamp = { ...updated, updatedAt: new Date().toISOString() };
+    await saveContactToDB(updatedWithTimestamp);
+    setContacts(prev => prev.map(c => c.id === updatedWithTimestamp.id ? updatedWithTimestamp : c));
+
+    // Background Firebase sync
+    triggerFirebaseSync();
   };
 
   const handleRetryContactDispatch = async (contact) => {
@@ -688,6 +721,9 @@ function App() {
     await saveFolderToDB(newFolder);
     setFolders(prev => [...prev, newFolder]);
     addToast(`Folder "${name}" created`, 'success');
+
+    // Background Firebase sync
+    triggerFirebaseSync();
     return newFolder;
   };
 
@@ -702,6 +738,9 @@ function App() {
     await saveFolderToDB(updated);
     setFolders(prev => prev.map(f => f.id === id ? updated : f));
     addToast('Folder name updated', 'success');
+
+    // Background Firebase sync
+    triggerFirebaseSync();
   };
 
   const handleDeleteFolder = async (id) => {
@@ -711,11 +750,25 @@ function App() {
     // For contacts inside this folder, reset folderId to null (meaning Uncategorized)
     const contactsInFolder = contacts.filter(c => c.folderId === id);
     for (const contact of contactsInFolder) {
-      const updatedContact = { ...contact, folderId: null };
+      const updatedContact = { ...contact, folderId: null, updatedAt: new Date().toISOString() };
       await saveContactToDB(updatedContact);
     }
     setContacts(prev => prev.map(c => c.folderId === id ? { ...c, folderId: null } : c));
     addToast('Folder deleted. Contacts moved to Uncategorized', 'success');
+
+    // Firebase: delete folder from Firestore (or queue if offline)
+    if (isFirebaseAvailable()) {
+      if (navigator.onLine) {
+        deleteFolderFromFirebase(String(id)).catch(err => {
+          console.warn('[Firebase] Failed to delete folder, queuing for retry:', err);
+          queueFirebaseDeletion(String(id), 'folder');
+        });
+      } else {
+        queueFirebaseDeletion(String(id), 'folder');
+      }
+    }
+    // Sync moved contacts
+    triggerFirebaseSync();
   };
 
   const PAGE_TITLE = {
