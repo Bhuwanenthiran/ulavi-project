@@ -48,12 +48,12 @@ export const syncContactToFirebase = async (contact) => {
   
   const cleanContact = sanitizeContactForFirebase(contact);
   const docRef = doc(db, 'contacts', cleanContact.id);
-  console.log(`[Firebase] Attempting to sync contact. ID: ${cleanContact.id}, Collection: contacts`, cleanContact);
+  console.log(`[Firebase] Attempting Firebase upload. ID: ${cleanContact.id}, Collection: contacts`, cleanContact);
   try {
     await setDoc(docRef, cleanContact);
-    console.log(`[Firebase] SUCCESS: Sync contact completed successfully. ID: ${cleanContact.id}, Collection: contacts`);
+    console.log(`[Firebase] SUCCESS: Upload succeeded. ID: ${cleanContact.id}, Collection: contacts`);
   } catch (error) {
-    console.error(`[Firebase] FAILURE: Sync contact failed. ID: ${cleanContact.id}, Collection: contacts. Error:`, error.stack || error);
+    console.error(`[Firebase] FAILURE: Upload failed. ID: ${cleanContact.id}, Collection: contacts. Error:`, error.stack || error);
     throw error;
   }
   return true;
@@ -85,12 +85,12 @@ export const syncFolderToFirebase = async (folder) => {
   
   const cleanFolder = sanitizeFolderForFirebase(folder);
   const docRef = doc(db, 'folders', cleanFolder.id);
-  console.log(`[Firebase] Attempting to sync folder. ID: ${cleanFolder.id}, Collection: folders`, cleanFolder);
+  console.log(`[Firebase] Attempting Firebase upload. ID: ${cleanFolder.id}, Collection: folders`, cleanFolder);
   try {
     await setDoc(docRef, cleanFolder);
-    console.log(`[Firebase] SUCCESS: Sync folder completed successfully. ID: ${cleanFolder.id}, Collection: folders`);
+    console.log(`[Firebase] SUCCESS: Upload succeeded. ID: ${cleanFolder.id}, Collection: folders`);
   } catch (error) {
-    console.error(`[Firebase] FAILURE: Sync folder failed. ID: ${cleanFolder.id}, Collection: folders. Error:`, error.stack || error);
+    console.error(`[Firebase] FAILURE: Upload failed. ID: ${cleanFolder.id}, Collection: folders. Error:`, error.stack || error);
     throw error;
   }
   return true;

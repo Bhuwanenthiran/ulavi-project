@@ -170,7 +170,6 @@ export const processQueue = async (onQueueProcessed, onSyncResult) => {
               contact = { 
                 ...contact, 
                 zohoStatus: 'synced', 
-                syncStatus: 'synced', 
                 syncedToZoho: true,
                 lastSyncAt: contact.lastSyncAt || new Date().toISOString()
               };
@@ -183,7 +182,7 @@ export const processQueue = async (onQueueProcessed, onSyncResult) => {
               continue;
             }
 
-            contact = { ...contact, zohoStatus: 'sending', syncStatus: 'pending' };
+            contact = { ...contact, zohoStatus: 'sending' };
             contactsMap.set(contact.id, contact);
             await saveContactToDB(contact);
 
@@ -194,7 +193,6 @@ export const processQueue = async (onQueueProcessed, onSyncResult) => {
               contact = { 
                 ...contact, 
                 zohoStatus: 'synced', 
-                syncStatus: 'synced', 
                 zohoLeadId: duplicateCheck.lead.id,
                 syncedToZoho: true,
                 duplicateDetected: true,
@@ -218,7 +216,6 @@ export const processQueue = async (onQueueProcessed, onSyncResult) => {
               contact = { 
                 ...contact, 
                 zohoStatus: 'synced', 
-                syncStatus: 'synced', 
                 zohoLeadId: res.zohoLeadId,
                 syncedToZoho: true,
                 lastSyncAt: new Date().toISOString()

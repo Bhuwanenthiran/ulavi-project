@@ -152,6 +152,9 @@ export const triggerFirebaseSync = async () => {
     
     // 2. Sync pending folders
     const localFolders = await getFoldersFromDB();
+    const pendingFolders = localFolders.filter(f => f.syncStatus !== 'synced');
+    console.log(`[FirebaseSync] Folders loaded from IndexedDB: ${localFolders.length}, pending folders selected for upload: ${pendingFolders.length}`);
+    
     for (const folder of localFolders) {
       if (folder.syncStatus !== 'synced') {
         try {
@@ -163,11 +166,16 @@ export const triggerFirebaseSync = async () => {
         } catch (err) {
           console.warn(`[FirebaseSync] Failed to sync folder ${folder.id}`, err);
         }
+      } else {
+        console.log(`[FirebaseSync] Skipping folder sync. ID: ${folder.id}, Name: "${folder.name}" because syncStatus is already 'synced'.`);
       }
     }
     
     // 3. Sync pending contacts
     const localContacts = await getContactsFromDB();
+    const pendingContacts = localContacts.filter(c => c.syncStatus !== 'synced');
+    console.log(`[FirebaseSync] Contacts loaded from IndexedDB: ${localContacts.length}, pending contacts selected for upload: ${pendingContacts.length}`);
+    
     for (const contact of localContacts) {
       if (contact.syncStatus !== 'synced') {
         try {
@@ -179,6 +187,8 @@ export const triggerFirebaseSync = async () => {
         } catch (err) {
           console.warn(`[FirebaseSync] Failed to sync contact ${contact.id}`, err);
         }
+      } else {
+        console.log(`[FirebaseSync] Skipping contact sync. ID: ${contact.id}, Name: "${contact.name}" because syncStatus is already 'synced'.`);
       }
     }
     

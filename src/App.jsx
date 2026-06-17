@@ -503,13 +503,21 @@ function App() {
           whatsappStatus: waStatus,
           emailStatus: emailStatus,
           zohoStatus: zohoStatus,
-          syncStatus: zohoStatus === 'synced' ? 'synced' : 'pending',
+          syncStatus: 'pending',
           zohoLeadId: zohoLeadIdResult,
           syncedToZoho: zohoStatus === 'synced' ? true : (activeForm.syncedToZoho || false),
           lastSyncAt: zohoStatus === 'synced' ? new Date().toISOString() : (activeForm.lastSyncAt || null),
           scannedAt: activeForm.scannedAt || new Date().toISOString(),
           avatarColor: activeForm.avatarColor || AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
         };
+
+        console.log('[FirebaseSync] Contact Saved Locally:', {
+          id: finalContact.id,
+          name: finalContact.name,
+          syncStatus: finalContact.syncStatus,
+          updatedAt: finalContact.updatedAt,
+          createdAt: finalContact.createdAt
+        });
 
         if (finalContact.imageBlob && !finalContact.previewUrl) {
           finalContact.previewUrl = URL.createObjectURL(finalContact.imageBlob);
@@ -717,7 +725,15 @@ function App() {
       name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      syncStatus: 'pending'
     };
+    console.log('[FirebaseSync] Folder Created Locally:', {
+      id: newFolder.id,
+      name: newFolder.name,
+      syncStatus: newFolder.syncStatus,
+      createdAt: newFolder.createdAt,
+      updatedAt: newFolder.updatedAt
+    });
     await saveFolderToDB(newFolder);
     setFolders(prev => [...prev, newFolder]);
     addToast(`Folder "${name}" created`, 'success');
@@ -733,8 +749,16 @@ function App() {
     const updated = {
       ...folder,
       name,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'pending'
     };
+    console.log('[FirebaseSync] Folder Updated Locally:', {
+      id: updated.id,
+      name: updated.name,
+      syncStatus: updated.syncStatus,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt
+    });
     await saveFolderToDB(updated);
     setFolders(prev => prev.map(f => f.id === id ? updated : f));
     addToast('Folder name updated', 'success');
@@ -744,13 +768,14 @@ function App() {
   };
 
   const handleDeleteFolder = async (id) => {
+    console.log('[FirebaseSync] Folder Deleted Locally. ID:', id);
     await deleteFolderFromDB(id);
     setFolders(prev => prev.filter(f => f.id !== id));
     
     // For contacts inside this folder, reset folderId to null (meaning Uncategorized)
     const contactsInFolder = contacts.filter(c => c.folderId === id);
     for (const contact of contactsInFolder) {
-      const updatedContact = { ...contact, folderId: null, updatedAt: new Date().toISOString() };
+      const updatedContact = { ...contact, folderId: null, updatedAt: new Date().toISOString(), syncStatus: 'pending' };
       await saveContactToDB(updatedContact);
     }
     setContacts(prev => prev.map(c => c.folderId === id ? { ...c, folderId: null } : c));
