@@ -54,7 +54,7 @@ function App() {
   const [contactProgressDetails, setContactProgressDetails] = useState({});
 
   const addToast = useToast();
-  const { emailSubject, fillTemplate } = useTemplates();
+  const { emailSubject, emailBody, fillTemplate } = useTemplates();
 
   const updateQueueCount = async () => {
     const q = await getQueue();
@@ -423,7 +423,7 @@ function App() {
           setProcessingSteps(localSteps);
         } else {
           try {
-            const emailResult = await sendEmail(activeForm, activeForm.emailMessage);
+            const emailResult = await sendEmail(activeForm, activeForm.emailMessage || fillTemplate(emailBody, activeForm));
             if (emailResult && emailResult.success) {
               localSteps = { ...localSteps, emailSend: 'success' };
               setProcessingSteps(localSteps);
@@ -542,7 +542,7 @@ function App() {
               contactId: finalContact.id,
               email: finalContact.email,
               subject: fillTemplate(emailSubject, finalContact),
-              message: finalContact.emailMessage
+              message: finalContact.emailMessage || fillTemplate(emailBody, finalContact)
             });
           }
           if (zohoStatus === 'queued') {
@@ -698,7 +698,7 @@ function App() {
         contactId: contact.id,
         email: contact.email,
         subject: fillTemplate(emailSubject, contact),
-        message: contact.emailMessage
+        message: contact.emailMessage || fillTemplate(emailBody, contact)
       });
     }
     if (contact.whatsappStatus === 'failed' || contact.whatsappStatus === 'queued') {

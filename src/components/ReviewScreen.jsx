@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useTemplates } from '../context/TemplateContext';
 import ContactSelectionModal from './ContactSelectionModal';
@@ -45,46 +45,17 @@ export default function ReviewScreen({ scannedData, previewUrl, onSave, onDiscar
     phone: '', altPhone: '', 
     ...scannedData,
   });
-  const [emailMessage, setEmailMessage] = useState(() => {
-    return `Hello ${scannedData?.name || ''},
-
-Thank you for connecting with CardSync.
-
-Your contact details have been saved successfully.
-
-We look forward to staying connected.
-
-Regards,
-Team CardSync`;
-  });
-  const [userEditedEmail, setUserEditedEmail] = useState(false);
+  const [previewTab, setPreviewTab] = useState('whatsapp');
   const [showPicker, setShowPicker] = useState(() => {
     const hasMultiple = (scannedData?.phones?.length > 1) || (scannedData?.emails?.length > 1);
     return hasMultiple;
   });
   const [errors, setErrors] = useState({});
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewTab, setPreviewTab] = useState('whatsapp');
   const addToast = useToast();
   const { waTemplate, emailSubject, emailBody, fillTemplate } = useTemplates();
 
   const handleFieldChange = (key, value) => {
-    setForm(prev => {
-      const updated = { ...prev, [key]: value };
-      if (key === 'name' && !userEditedEmail) {
-        setEmailMessage(`Hello ${value || ''},
-
-Thank you for connecting with CardSync.
-
-Your contact details have been saved successfully.
-
-We look forward to staying connected.
-
-Regards,
-Team CardSync`);
-      }
-      return updated;
-    });
+    setForm(prev => ({ ...prev, [key]: value }));
   };
 
   const handlePickerConfirm = ({ selectedPhone, selectedEmail }) => {
@@ -95,28 +66,13 @@ Team CardSync`);
     const altPhone = allPhones.find(p => p !== selectedPhone) || '';
     const altEmail = allEmails.find(e => e !== selectedEmail) || '';
 
-    setForm(prev => {
-      const updated = {
-        ...prev,
-        phone: selectedPhone,
-        email: selectedEmail,
-        altPhone,
-        altEmail
-      };
-      if (!userEditedEmail) {
-        setEmailMessage(`Hello ${updated.name || ''},
-
-Thank you for connecting with CardSync.
-
-Your contact details have been saved successfully.
-
-We look forward to staying connected.
-
-Regards,
-Team CardSync`);
-      }
-      return updated;
-    });
+    setForm(prev => ({
+      ...prev,
+      phone: selectedPhone,
+      email: selectedEmail,
+      altPhone,
+      altEmail
+    }));
     
     console.log('[Debug] Contact Selection Confirmed:', { selectedPhone, selectedEmail, altPhone, altEmail });
     setShowPicker(false);
@@ -126,27 +82,6 @@ Team CardSync`);
   const [notes, setNotes] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [speechLang, setSpeechLang] = useState('en-US');
-
-  useEffect(() => {
-    if (!userEditedEmail) {
-      let baseMessage = `Hello ${form.name || ''},
-
-Thank you for connecting with CardSync.
-
-Your contact details have been saved successfully.`;
-
-      if (notes.trim()) {
-        baseMessage += `\n\nMessage from our team:\n${notes.trim()}`;
-      }
-
-      baseMessage += `\n\nWe look forward to staying connected.
-
-Regards,
-Team CardSync`;
-
-      setEmailMessage(baseMessage);
-    }
-  }, [notes, form.name, userEditedEmail]);
 
   // Helper to run voice recognition
   const startSpeechRecognition = (targetSetter, listeningStateSetter) => {
@@ -243,7 +178,6 @@ Team CardSync`;
     onSave({
       ...form,
       folderId: finalFolderId,
-      emailMessage: emailMessage,
       notes: notes.trim()
     });
   };
@@ -476,64 +410,96 @@ Team CardSync`;
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="material-icons" style={{ color: 'var(--primary)', fontSize: 20 }}>email</span>
-          Follow-up Email Message
-        </h3>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <div style={{ position: 'relative' }}>
-            <textarea
-              className="form-input"
-              value={emailMessage}
-              onChange={e => {
-                setEmailMessage(e.target.value);
-                setUserEditedEmail(true);
-              }}
-              placeholder=" "
-              style={{
-                height: 'auto',
-                paddingTop: 12,
-                paddingBottom: 12,
-                resize: 'vertical',
-                minHeight: '150px',
-                fontFamily: 'inherit',
-                lineHeight: '1.5'
-              }}
-            />
-            <label className="form-label">Email Message</label>
+      {/* Message Preview — tabbed card, read-only */}
+      <div className="card" style={{ padding: 0, marginBottom: 24, overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
+          <span className="material-icons" style={{ color: 'var(--primary)' }}>visibility</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>Message Preview</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Read-only · Actual messages that will be sent</div>
           </div>
         </div>
-      </div>
+        <div style={{ padding: '16px 20px 20px 20px' }}>
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: 'var(--background)', padding: 4, borderRadius: 12 }}>
+            <button
+              onClick={() => setPreviewTab('whatsapp')}
+              style={{
+                flex: 1, padding: '8px', borderRadius: 10, border: 'none',
+                background: previewTab === 'whatsapp' ? 'white' : 'transparent',
+                boxShadow: previewTab === 'whatsapp' ? 'var(--shadow-sm)' : 'none',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                color: previewTab === 'whatsapp' ? '#25d366' : 'var(--text-secondary)',
+                transition: 'all 0.2s ease',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
+              }}
+            >
+              💬 WhatsApp
+            </button>
+            <button
+              onClick={() => setPreviewTab('email')}
+              style={{
+                flex: 1, padding: '8px', borderRadius: 10, border: 'none',
+                background: previewTab === 'email' ? 'white' : 'transparent',
+                boxShadow: previewTab === 'email' ? 'var(--shadow-sm)' : 'none',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                color: previewTab === 'email' ? 'var(--primary)' : 'var(--text-secondary)',
+                transition: 'all 0.2s ease',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
+              }}
+            >
+              📧 Email
+            </button>
+          </div>
 
-      <div className="card" style={{ padding: 0, marginBottom: 24, overflow: 'hidden' }}>
-        <button onClick={() => setPreviewOpen(!previewOpen)} style={{ width: '100%', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, color: 'var(--text-primary)' }}>
-            <span className="material-icons" style={{ color: 'var(--primary)' }}>visibility</span>
-            Message Preview
-          </div>
-          <span className="material-icons" style={{ color: 'var(--text-secondary)' }}>{previewOpen ? 'expand_less' : 'expand_more'}</span>
-        </button>
-        {previewOpen && (
-          <div style={{ padding: '0 20px 20px 20px' }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: 'var(--background)', padding: 4, borderRadius: 12 }}>
-              <button onClick={() => setPreviewTab('whatsapp')} style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', background: previewTab === 'whatsapp' ? 'white' : 'transparent', boxShadow: previewTab === 'whatsapp' ? 'var(--shadow-sm)' : 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: previewTab === 'whatsapp' ? 'var(--primary)' : 'var(--text-secondary)' }}>WhatsApp</button>
-              <button onClick={() => setPreviewTab('email')} style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', background: previewTab === 'email' ? 'white' : 'transparent', boxShadow: previewTab === 'email' ? 'var(--shadow-sm)' : 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: previewTab === 'email' ? 'var(--primary)' : 'var(--text-secondary)' }}>Email</button>
+          {/* WhatsApp tab content */}
+          {previewTab === 'whatsapp' && (
+            <div style={{ background: '#ece5dd', borderRadius: 12, padding: '16px 14px', minHeight: 80 }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '0 12px 12px 12px',
+                padding: '10px 14px',
+                maxWidth: '88%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                fontSize: 13.5,
+                lineHeight: 1.6,
+                color: '#111',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}>
+{`Hello ${form.name || 'Contact Name'},
+
+Your connection with CardConnect AI has been successfully established.
+
+We're delighted to have your contact information and look forward to building a lasting professional relationship.
+
+Sincerely,
+Team CardConnect AI`}
+              </div>
+              <div style={{ fontSize: 10, color: '#667', marginTop: 4, marginLeft: 2 }}>✓✓ Delivered</div>
             </div>
-            {previewTab === 'whatsapp' ? (
-              <div className="wa-chat-bg">
-                <div className="wa-bubble">{fillTemplate(waTemplate, form)}</div>
+          )}
+
+          {/* Email tab content */}
+          {previewTab === 'email' && (
+            <div className="email-preview">
+              <div className="email-preview-header">
+                <strong>Subject:</strong> {fillTemplate(emailSubject, form)}
               </div>
-            ) : (
-              <div className="email-preview">
-                <div className="email-preview-header">
-                  <strong>Subject:</strong> {fillTemplate(emailSubject, form)}
-                </div>
-                 <div className="email-preview-body" style={{ whiteSpace: 'pre-wrap' }}>{emailMessage}</div>
+              <div className="email-preview-body" style={{ whiteSpace: 'pre-wrap' }}>
+{`Hello ${form.name || 'Contact Name'},
+
+Your connection with CardConnect AI has been successfully established.
+
+We're delighted to have your contact information and look forward to building a lasting professional relationship.
+
+Sincerely,
+Team CardConnect AI`}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
