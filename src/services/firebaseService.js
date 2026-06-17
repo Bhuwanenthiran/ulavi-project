@@ -42,47 +42,75 @@ const sanitizeFolderForFirebase = (folder) => {
 
 export const syncContactToFirebase = async (contact) => {
   if (!isFirebaseAvailable()) {
+    console.error('[Firebase] syncContactToFirebase failed: Firebase is not initialized or configured.');
     throw new Error('Firebase is not configured.');
   }
   
   const cleanContact = sanitizeContactForFirebase(contact);
   const docRef = doc(db, 'contacts', cleanContact.id);
-  await setDoc(docRef, cleanContact);
-  console.log(`[Firebase] Contact ${cleanContact.id} synced successfully.`);
+  console.log(`[Firebase] Attempting to sync contact. ID: ${cleanContact.id}, Collection: contacts`, cleanContact);
+  try {
+    await setDoc(docRef, cleanContact);
+    console.log(`[Firebase] SUCCESS: Sync contact completed successfully. ID: ${cleanContact.id}, Collection: contacts`);
+  } catch (error) {
+    console.error(`[Firebase] FAILURE: Sync contact failed. ID: ${cleanContact.id}, Collection: contacts. Error:`, error.stack || error);
+    throw error;
+  }
   return true;
 };
 
 export const deleteContactFromFirebase = async (contactId) => {
   if (!isFirebaseAvailable()) {
+    console.error('[Firebase] deleteContactFromFirebase failed: Firebase is not initialized or configured.');
     throw new Error('Firebase is not configured.');
   }
   
   const docRef = doc(db, 'contacts', String(contactId));
-  await deleteDoc(docRef);
-  console.log(`[Firebase] Contact ${contactId} deleted successfully.`);
+  console.log(`[Firebase] Attempting to delete contact. ID: ${contactId}, Collection: contacts`);
+  try {
+    await deleteDoc(docRef);
+    console.log(`[Firebase] SUCCESS: Delete contact completed successfully. ID: ${contactId}, Collection: contacts`);
+  } catch (error) {
+    console.error(`[Firebase] FAILURE: Delete contact failed. ID: ${contactId}, Collection: contacts. Error:`, error.stack || error);
+    throw error;
+  }
   return true;
 };
 
 export const syncFolderToFirebase = async (folder) => {
   if (!isFirebaseAvailable()) {
+    console.error('[Firebase] syncFolderToFirebase failed: Firebase is not initialized or configured.');
     throw new Error('Firebase is not configured.');
   }
   
   const cleanFolder = sanitizeFolderForFirebase(folder);
   const docRef = doc(db, 'folders', cleanFolder.id);
-  await setDoc(docRef, cleanFolder);
-  console.log(`[Firebase] Folder ${cleanFolder.id} synced successfully.`);
+  console.log(`[Firebase] Attempting to sync folder. ID: ${cleanFolder.id}, Collection: folders`, cleanFolder);
+  try {
+    await setDoc(docRef, cleanFolder);
+    console.log(`[Firebase] SUCCESS: Sync folder completed successfully. ID: ${cleanFolder.id}, Collection: folders`);
+  } catch (error) {
+    console.error(`[Firebase] FAILURE: Sync folder failed. ID: ${cleanFolder.id}, Collection: folders. Error:`, error.stack || error);
+    throw error;
+  }
   return true;
 };
 
 export const deleteFolderFromFirebase = async (folderId) => {
   if (!isFirebaseAvailable()) {
+    console.error('[Firebase] deleteFolderFromFirebase failed: Firebase is not initialized or configured.');
     throw new Error('Firebase is not configured.');
   }
   
   const docRef = doc(db, 'folders', String(folderId));
-  await deleteDoc(docRef);
-  console.log(`[Firebase] Folder ${folderId} deleted successfully.`);
+  console.log(`[Firebase] Attempting to delete folder. ID: ${folderId}, Collection: folders`);
+  try {
+    await deleteDoc(docRef);
+    console.log(`[Firebase] SUCCESS: Delete folder completed successfully. ID: ${folderId}, Collection: folders`);
+  } catch (error) {
+    console.error(`[Firebase] FAILURE: Delete folder failed. ID: ${folderId}, Collection: folders. Error:`, error.stack || error);
+    throw error;
+  }
   return true;
 };
 

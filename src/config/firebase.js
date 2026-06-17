@@ -22,13 +22,18 @@ let db = null;
 if (isConfigured) {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    console.log('[Firebase] Firebase initialized');
     db = getFirestore(app);
-    console.log('[Firebase] Initialized successfully.');
+    console.log('[Firebase] Firestore connected');
   } catch (error) {
-    console.error('[Firebase] Initialization error:', error);
+    console.error('[Firebase] Initialization error:', error.stack || error);
   }
 } else {
-  console.warn('[Firebase] Credentials missing. Running in local-only mode.');
+  console.warn('[Firebase] Configuration is missing or incomplete. Running in local-only mode. Missing keys:', {
+    VITE_FIREBASE_API_KEY: !firebaseConfig.apiKey ? 'MISSING' : 'OK',
+    VITE_FIREBASE_PROJECT_ID: !firebaseConfig.projectId ? 'MISSING' : 'OK',
+    VITE_FIREBASE_APP_ID: !firebaseConfig.appId ? 'MISSING' : 'OK'
+  });
 }
 
 export { app, db };
