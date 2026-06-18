@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { encryptData, decryptData, isEncrypted } from '../utils/encryptionService';
 
 const DB_NAME = 'cardconnect-db';
 const DB_VERSION = 2;
@@ -24,14 +25,36 @@ export const initDB = async () => {
   return dbPromise;
 };
 
+// Helper function to handle transparent decryption and migration of old records
+async function processReadItem(item, storeName) {
+  if (!item) return item;
+  if (isEncrypted(item)) {
+    return decryptData(item);
+  }
+  
+  // Unencrypted old record: migrate it!
+  try {
+    console.log(`[Encryption] Migration triggered for ${storeName} record:`, item.id);
+    const db = await initDB();
+    const encrypted = await encryptData(item);
+    await db.put(storeName, encrypted);
+    console.log(`[Encryption] Migration completed for ${storeName} record:`, item.id);
+  } catch (err) {
+    console.error(`[Encryption] Migration failed for ${storeName} record:`, item.id, err);
+  }
+  return item;
+}
+
 export const getContactsFromDB = async () => {
   const db = await initDB();
-  return db.getAll('contacts');
+  const rawList = await db.getAll('contacts');
+  return Promise.all(rawList.map(item => processReadItem(item, 'contacts')));
 };
 
 export const saveContactToDB = async (contact) => {
   const db = await initDB();
-  return db.put('contacts', contact);
+  const encrypted = await encryptData(contact);
+  return db.put('contacts', encrypted);
 };
 
 export const deleteContactFromDB = async (id) => {
@@ -41,12 +64,14 @@ export const deleteContactFromDB = async (id) => {
 
 export const getFoldersFromDB = async () => {
   const db = await initDB();
-  return db.getAll('folders');
+  const rawList = await db.getAll('folders');
+  return Promise.all(rawList.map(item => processReadItem(item, 'folders')));
 };
 
 export const saveFolderToDB = async (folder) => {
   const db = await initDB();
-  return db.put('folders', folder);
+  const encrypted = await encryptData(folder);
+  return db.put('folders', encrypted);
 };
 
 export const deleteFolderFromDB = async (id) => {
@@ -56,12 +81,15 @@ export const deleteFolderFromDB = async (id) => {
 
 export const addActionToQueue = async (action) => {
   const db = await initDB();
-  return db.add('queue', { ...action, timestamp: Date.now() });
+  const rawAction = { ...action, timestamp: Date.now() };
+  const encrypted = await encryptData(rawAction);
+  return db.add('queue', encrypted);
 };
 
 export const getQueue = async () => {
   const db = await initDB();
-  return db.getAll('queue');
+  const rawList = await db.getAll('queue');
+  return Promise.all(rawList.map(item => processReadItem(item, 'queue')));
 };
 
 export const removeActionFromQueue = async (id) => {
@@ -71,10 +99,12 @@ export const removeActionFromQueue = async (id) => {
 
 export const updateQueueItem = async (item) => {
   const db = await initDB();
-  return db.put('queue', item);
+  const encrypted = await encryptData(item);
+  return db.put('queue', encrypted);
 };
 
 export const clearQueue = async () => {
   const db = await initDB();
   return db.clear('queue');
 };
+
