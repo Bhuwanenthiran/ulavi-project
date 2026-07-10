@@ -355,11 +355,7 @@ Required variables include:
 
 ---
 
-# 👨‍💻 Developed By
 
-**CardConnect AI Development Team**
-
-Built as an AI-powered Business Card Management System integrating OCR, CRM Automation, Email Automation, WhatsApp Cloud Messaging, and Offline Synchronization.
 
 ---
 
